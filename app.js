@@ -191,7 +191,7 @@ function viewHome() {
   </div>
   <div class="card day hday ${items.length ? '' : 'rest'}"><img class="lily" src="lliri.png" alt="" aria-hidden="true">
     <h2><span class="wd" lang="ja" style="margin-top:-2px">${'月火水木金土日'[todayIdx]}</span>${DAY_NAMES[todayIdx]}</h2>
-    ${items.length ? `<ul>${items.map(i => `<li>${exLabel(i)}</li>`).join('')}</ul>`
+    ${items.length ? `<ul>${items.map(i => `<li>${injRisk(i) ? '⚠ ' : ''}${esc(i)}</li>`).join('')}</ul>`
       : `<button class="small" onclick="go('plan')">+ Afegir al pla</button>`}
   </div>
   ${injList().map(j => `<div class="card day"><h2>Rehab · ${injName(j)}</h2>
@@ -511,8 +511,8 @@ function viewSession() {
   </div>` : viewGym(a)}
   <div class="card">
     <h2>Acabar sessió</h2>
-    <label>Esforç (1-10)</label>${scale('rpe', a.rpe)}
-    <label>Fatiga (1-10)</label>${scale('fatigue', a.fatigue)}
+    <label>Esforç</label>${scale('rpe', a.rpe)}
+    <label>Fatiga</label>${scale('fatigue', a.fatigue)}
     ${discardAsk
       ? `<p>Descartar sessió?</p><p class="row"><button onclick="askDiscard(false)">Cancel·lar</button>
       <button class="primary" style="background:var(--bad)" onclick="cancelSession()">Descartar</button></p>`
@@ -521,14 +521,19 @@ function viewSession() {
   </div>`;
 }
 // Escala de 10 punts seleccionables (esforç / fatiga)
-function scale(key, val) {
-  return `<div class="scale" id="sc-${key}">${[...Array(10)].map((_, i) =>
-    `<button class="${val === i + 1 ? 'on' : ''}" onclick="setScale('${key}',${i + 1})">${i + 1}</button>`).join('')}</div>`;
+// Barra lliscant de nombres enters (1-10) amb el valor a la dreta i les marques a sota
+function slider(id, val, on, change = '', min = 1, max = 10) {
+  const v = Math.min(max, Math.max(min, Math.round(val || (min + max) / 2)));
+  return `<div class="sld"><input type="range" id="${id}" min="${min}" max="${max}" step="1" value="${v}" style="--p:${(v - min) / (max - min) * 100}%" aria-label="${id}"
+      oninput="sldMove(this);${on}" ${change ? `onchange="${change}"` : ''}><output>${v}</output></div>
+    <div class="sldt" aria-hidden="true">${[...Array(max - min + 1)].map((_, i) => `<span>${min + i}</span>`).join('')}</div>`;
 }
-function setScale(key, n) {
-  S.active[key] = n; save();
-  document.querySelectorAll(`#sc-${key} button`).forEach((b, i) => b.classList.toggle('on', i + 1 === n));
+function sldMove(el) {
+  el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%');
+  el.nextElementSibling.textContent = el.value;
 }
+const scale = (key, val) => slider('sc-' + key, val || 5, `setScale('${key}',+this.value)`);
+function setScale(key, n) { S.active[key] = n; save(); }
 function setType(t) { S.active.type = t; save(); render(); }
 // Botons de selecció (sense tornar a pintar, per no perdre el text escrit)
 function segPick(key, opts, val) {
@@ -1023,7 +1028,7 @@ function viewPlan() {
   ${DAY_NAMES.map((name, i) => {
     const list = planDay(i);
     return `<div class="card day ${list.length ? '' : 'rest'}" ${i === todayIdx ? 'style="border-color:var(--warn)"' : ''}>
-    <span class="wd" lang="ja">${'月火水木金土日'[i]}</span><b>${name}${i === todayIdx ? ' (avui)' : ''}</b>${list.length ? '' : ' · <span class="muted">Descans</span>'}
+    <span class="wd" lang="ja">${'月火水木金土日'[i]}</span><b>${name}</b>${list.length ? '' : ' · <span class="muted">Descans</span>'}
     ${list.length || (planOff[i] || []).length ? `<div class="chips planchips">${[...list, ...(planOff[i] || [])].map((x, k) => `<button class="chip ${k < list.length ? 'on' : ''}" onclick="togglePlanChip(${i},${k})">${exLabel(x)}</button>`).join('')}</div>` : ''}
     ${planAdd === i ? picker(i) : `<button class="small" style="margin-top:8px" onclick="togglePlanAdd(${i})">+ Afegir</button>`}
   </div>`; }).join('')}
@@ -1325,7 +1330,7 @@ function garminRow(s, i) {
     spark = `<svg class="hrchart" viewBox="0 0 300 46" preserveAspectRatio="none" role="img" aria-label="Pulsacions durant la sessió"><polyline points="${h.map((x, k) => `${(k / (h.length - 1) * 300).toFixed(1)},${(42 - (x - lo) / vr * 38).toFixed(1)}`).join(' ')}" fill="none" stroke="var(--accent-soft)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
   }
   return `<p style="margin:0"><span class="tag">Garmin</span> ${g.avg ? `<span class="tag warn">♥ ${g.avg}${g.max ? ` / ${g.max}` : ''}</span> ` : ''}${g.kcal ? `<span class="tag">${g.kcal} kcal</span>` : ''}</p>${spark}
-    <label style="margin-top:8px">Esforç (1-10)</label><div class="scale">${[...Array(10)].map((_, k) => `<button class="${s.rpe === k + 1 ? 'on' : ''}" onclick="setSessRpe(${i},${k + 1})">${k + 1}</button>`).join('')}</div>`;
+    <label style="margin-top:8px">Esforç</label>${slider('rpe-' + i, s.rpe || 5, `S.sessions[${i}].rpe=+this.value;save()`, 'render()')}`;
 }
 
 // ---------- Força de dits: test de suspensió màxima (llast afegit, kg) ----------
