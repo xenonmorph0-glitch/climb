@@ -445,3 +445,8 @@ nav#tabs button.on svg .d { stroke: var(--paper); fill: var(--paper); }
   .wz-nav button { width: 34px; height: 34px; }
   .wz-nav svg { width: 17px; height: 17px; }
 }
+
+/* Evita que l'animacio d'entrada cap a la dreta eixampli la pagina (feia saltar tota la pantalla) */
+html, body { overflow-x: hidden; overflow-x: clip; }
+#view { overflow-x: clip; }
+
