@@ -1048,6 +1048,7 @@ function viewProfile() {
   ${viewWeight()}
   ${viewRecovery()}
   ${viewRemind()}
+  ${viewInstall()}
   <div class="card">
     <h2>Dades</h2>
     <p class="muted">Es desa només al mòbil</p>
@@ -1055,6 +1056,24 @@ function viewProfile() {
       <button onclick="$('imp').click()">Importar</button></div>
     <input id="imp" type="file" accept=".json" style="display:none" onchange="importData(this.files[0])">
   </div>`;
+}
+// ---------- Instal·lar l'app ----------
+let installEv = null;
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEv = e; if (tab === 'profile') render(); });
+window.addEventListener('appinstalled', () => { installEv = null; if (tab === 'profile') render(); });
+function doInstall() {
+  if (!installEv) return;
+  installEv.prompt();
+  installEv.userChoice.finally(() => { installEv = null; render(); });
+}
+function viewInstall() {
+  if (isStandalone()) return `<div class="card"><h2>Instal·lar l'app</h2><p class="muted"><span class="tag ok">Instal·lada</span></p></div>`;
+  const how = installEv ? '<p class="muted">Afegeix Climb a la pantalla d\'inici i s\'obrirà com una app, a pantalla completa.</p><p><button class="primary" style="width:100%" onclick="doInstall()">Instal·lar</button></p>'
+    : isIOS() ? '<p class="muted">A l\'iPhone o iPad, obre aquesta pàgina amb <b>Safari</b>, toca el botó <b>Compartir</b> (el quadrat amb la fletxa amunt) i tria <b>Afegir a la pantalla d\'inici</b>.</p>'
+    : '<p class="muted">Obre aquesta pàgina amb <b>Chrome</b>, toca el menú <b>⋮</b> i tria <b>Instal·lar l\'aplicació</b> (o <b>Afegir a la pantalla d\'inici</b>).</p>';
+  return `<div class="card"><h2>Instal·lar l'app</h2>${how}</div>`;
 }
 // ---------- Recordatoris ----------
 // Notificació els dies que el pla té exercicis (només si l'app és oberta) i fitxer .ics per al calendari del mòbil.
@@ -1361,7 +1380,8 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   const idle = () => !S.active && !picking && !wz;
   const tryReload = () => { if (updatePending && idle()) location.reload(); };
   navigator.serviceWorker.register('sw.js').then(reg => {
-    const check = () => reg.update().catch(() => {});
+    const check = () => reg.update().catch(() => {}); check();
+        window.addEventListener('online', check); window.addEventListener('pageshow', check);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { check(); tryReload(); } });
     setInterval(() => { check(); tryReload(); }, 30 * 60 * 1000);
   });
