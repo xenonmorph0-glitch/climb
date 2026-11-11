@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ca">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#100f0e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Climb">
+  <title>Climb</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><div class="ttl"><h1 id="title">Inici</h1><span id="jp" lang="ja">今日</span></div><img id="logo" src="icon.svg" alt="Climb" width="32" height="32"></header>
+  <main id="view"></main>
+  <nav id="tabs">
+    <button data-tab="home" aria-label="Inici"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 11v9h13v-9"/><path d="M3.5 11.5L12 4l8.5 7.5"/><rect class="rf" x="10.4" y="14.2" width="3.2" height="4.3" rx=".5"/></svg><span>Inici</span></button>
+    <button data-tab="session" aria-label="Sessió"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 19.5L9 7.5l4 7 2.6-3.6 5.9 8.6z"/><circle class="r rf" cx="18" cy="5.5" r="2"/></svg><span>Sessió</span></button>
+    <!-- Timer amagat de moment (el codi i la vista segueixen a app.js); per tornar-lo, treu els marcadors del comentari -->
+    <!-- <button data-tab="timer" aria-label="timer"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="8" fill="none" stroke="currentColor" stroke-width="3"/><rect x="9" y="1.5" width="6" height="3"/><path class="r" d="M12 7.5L14.2 14L12 16L9.8 14Z"/></svg><span>Timer</span></button> -->
+    <button data-tab="history" aria-label="Historial"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path class="r" d="M12 7.5V12l3 2"/></svg><span>Historial</span></button>
+    <button data-tab="plan" aria-label="Pla"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="r" d="M3 7.5Q12 5 21 7.5"/><path d="M5.5 11.5h13M7.5 7.2V20M16.5 7.2V20"/></svg><span>Pla</span></button>
+    <button data-tab="profile" aria-label="Perfil"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="f" cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3-6 7-6s7 2.1 7 6"/></svg><span>Perfil</span></button>
+  </nav>
+  <script src="app.js"></script>
+
+</body>
+</html>
