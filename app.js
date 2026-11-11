@@ -191,7 +191,7 @@ function viewHome() {
   </div>
   <div class="card day hday ${items.length ? '' : 'rest'}"><img class="lily" src="lliri.png" alt="" aria-hidden="true">
     <h2><span class="wd" lang="ja" style="margin-top:-2px">${'月火水木金土日'[todayIdx]}</span>${DAY_NAMES[todayIdx]}</h2>
-    ${items.length ? `<ul>${items.map(i => `<li>${injRisk(i) ? '⚠ ' : ''}${esc(i)}</li>`).join('')}</ul>`
+    ${items.length ? `<ul>${items.map(i => `<li>${injRisk(i) ? warnI() : ''}${esc(i)}</li>`).join('')}</ul>`
       : `<button class="small" onclick="go('plan')">+ Afegir al pla</button>`}
   </div>
   ${injList().map(j => `<div class="card day"><h2>Rehab · ${injName(j)}</h2>
@@ -332,7 +332,7 @@ function wzCenter() {
 }
 function wzHtml() {
   const w = wz, enter = w.enter; w.enter = false;
-  if (w.phase === 'intro') return `<button class="primary" style="width:100%;margin-bottom:14px" onclick="wzBegin()">▶ Començar</button>${warmSteps(WARMUP)}`;
+  if (w.phase === 'intro') return `<button class="primary" style="width:100%;margin-bottom:14px" onclick="wzBegin()">${ic('play')}Començar</button>${warmSteps(WARMUP)}`;
   const bar = `<div class="wz-bar">${WARMUP.map((_, k) => `<i class="${w.phase === 'done' || k < w.i ? 'done' : k === w.i ? 'cur' : ''}"></i>`).join('')}</div>`;
   if (w.phase === 'done') return `${bar}<div class="wz-done"><div class="wz-enso"><svg viewBox="0 0 200 200" aria-hidden="true"><path class="e1" d="M146 36A74 74 0 1 0 172 106"/><path class="e2" d="M150 32A78 78 0 1 0 176 112"/></svg>
       <img class="inkw zen" src="art/meditacio.png" alt=""><span class="wz-seal" lang="ja" aria-hidden="true">整</span><span class="wz-vert" lang="ja" aria-hidden="true">準備完了</span></div>
@@ -345,7 +345,7 @@ function wzHtml() {
   const pips = Array.from({ length: s.sets }, (_, k) => `<i class="${k < w.set - 1 ? 'done' : k === w.set - 1 && w.phase !== 'rest' ? 'cur' : ''}"></i>`).join('');
   const btn = w.phase === 'ready' ? `<button class="primary" style="width:100%" onclick="wzNext()">Començar ara</button>`
     : w.phase === 'rest' ? `<button class="primary" style="width:100%" onclick="wzNext()">Saltar descans</button>`
-    : !timed ? `<button class="primary" style="width:100%" onclick="wzDone()">Sèrie feta ✓</button>` : '';
+    : !timed ? `<button class="primary" style="width:100%" onclick="wzDone()">Sèrie feta${ic('check')}</button>` : '';
   return `${bar}
     <div class="wz-stage${enter ? ' in' : ''}"><div class="wz-disc"></div>
       <svg class="wz-ring ${w.phase}${timed ? '' : ' full'}" viewBox="0 0 200 200" aria-hidden="true"><circle class="t" cx="100" cy="100" r="88"/><circle class="p" id="wzr" cx="100" cy="100" r="88" style="stroke-dasharray:${WZ_C};stroke-dashoffset:${off}"/></svg>
@@ -444,7 +444,7 @@ function itvSync(left) {
   const name = r && { ready: 'Preparat', work: 'Treball', rest: 'Descans', setrest: 'Descans entre sèries' }[r.phase];
   d.innerHTML = r ? `${fmt(Math.ceil(left))}<div class="muted" style="font-size:14px;font-weight:400">${name}${r.phase === 'ready' ? '' : ` · sèrie ${r.set} de ${itv.sets} · repetició ${r.rep} de ${itv.reps}`}</div>`
     : itvDone ? 'Fet!' : fmt(itv.work);
-  $('itvBtn').textContent = r ? '■ Aturar' : '▶ Iniciar';
+  $('itvBtn').innerHTML = r ? ic('stop') + 'Aturar' : ic('play') + 'Iniciar';
   document.querySelectorAll('.itvin').forEach(i => i.disabled = !!r);
 }
 function viewItv() {
@@ -453,13 +453,13 @@ function viewItv() {
     <div class="row">${f('work', 'Treball (s)')}${f('rest', 'Descans (s)')}${f('reps', 'Repeticions')}</div>
     <div class="row">${f('sets', 'Sèries')}${f('setRest', 'Descans sèries (s)')}</div>
     <div class="timer" id="itvDisp">${fmt(itv.work)}</div>
-    <button class="primary" id="itvBtn" style="width:100%" onclick="itvStart()">▶ Iniciar</button></div>
+    <button class="primary" id="itvBtn" style="width:100%" onclick="itvStart()">${ic('play')}Iniciar</button></div>
   <div class="card"><h2>Ajustos desats</h2>
     <div class="row"><input id="itvName" placeholder="Nom (ex. Penjades 7/3)" maxlength="30"><button class="small" style="flex:none" onclick="savePreset()">Desar</button></div>
     ${itvPresets.length ? `<ul class="list presets" style="margin-top:8px">${itvPresets.map((p, i) => `<li><span><b>${esc(p.name)}</b><br><span class="muted">${p.work} s treball · ${p.rest} s descans · ${p.reps} rep. · ${p.sets} sèr. · ${p.setRest} s entre sèr.</span></span>
       ${delAsk === i
         ? `<span class="pre"><button class="small" onclick="delCancel()">Cancel·lar</button><button class="small sure" onclick="delConfirm(${i})">Esborrar</button></span>`
-        : `<span class="pre"><button class="small itvin" onclick="loadPreset(${i})">Carregar</button><button class="small danger itvin" aria-label="Esborrar" onclick="delPreset(${i})">✕</button></span>`}</li>`).join('')}</ul>`
+        : `<span class="pre"><button class="small itvin" onclick="loadPreset(${i})">Carregar</button><button class="small danger itvin" aria-label="Esborrar" onclick="delPreset(${i})">${ic('x')}</button></span>`}</li>`).join('')}</ul>`
     : ''}</div>`;
 }
 function viewWarmups() {
@@ -482,7 +482,7 @@ function startRest(sec) { restEnd = Date.now() + sec * 1000; tick(); }
 function viewSession() {
   const a = S.active;
   if (!a && picking) return viewWarmups();
-  if (!a) return `<div class="card"><button class="primary" style="width:100%" onclick="startSession()">▶ Començar sessió</button></div>`;
+  if (!a) return `<div class="card"><button class="primary" style="width:100%" onclick="startSession()">${ic('play')}Començar sessió</button></div>`;
   const pick = a.pick || (a.pick = { color: 'Verd', level: 'fàcil' });
   return `
   <div class="card">
@@ -493,7 +493,7 @@ function viewSession() {
     <div class="timer rest" id="rest" style="font-size:28px"></div>
     <div class="seg">
       <button onclick="startRest(90)">1:30</button><button onclick="startRest(180)">3:00</button>
-      <button onclick="startRest(300)">5:00</button><button onclick="restEnd=0;tick()">✕</button>
+      <button onclick="startRest(300)">5:00</button><button aria-label="Tancar" onclick="restEnd=0;tick()">${ic('x')}</button>
     </div>
   </div>
   ${a.type === 'escalada' ? `${climbToday().length ? `<div class="card"><h2>Escalada d'avui</h2>
@@ -507,7 +507,7 @@ function viewSession() {
     ${tilePick('result', RESULTS, pick.result || 'flash', 'three')}
     <button class="primary" style="width:100%;margin-top:14px" onclick="addClimb()">+ Afegir</button>
     <ul class="list">${a.climbs.map((c, i) => `<li><span>${dot(c.grade)}<b>${c.grade}</b> <span class="ics">${ic(c.style)}${ic(c.result)}${c.first ? ic('star') : ''}</span></span>
-      <button class="small danger" onclick="S.active.climbs.splice(${i},1);save();render()">✕</button></li>`).join('')}</ul>
+      <button class="small danger" aria-label="Esborrar" onclick="S.active.climbs.splice(${i},1);save();render()">${ic('x')}</button></li>`).join('')}</ul>
   </div>` : viewGym(a)}
   <div class="card">
     <h2>Acabar sessió</h2>
@@ -548,9 +548,27 @@ const IC = {
   flash: `<path d="${BOLT}"/>`,
   semiflash: `<path d="${BOLT}" fill="none"/><clipPath id="hb"><rect x="0" y="0" width="12" height="24"/></clipPath><path d="${BOLT}" fill="currentColor" clip-path="url(#hb)"/>`,
   noflash: `<path d="${BOLT}" opacity=".55"/><path d="M4 4L20 20"/>`,
-  star: '<path d="M12 3L14.8 8.8L21 9.7L16.5 14.1L17.6 20.3L12 17.3L6.4 20.3L7.5 14.1L3 9.7L9.2 8.8Z"/>'
+  star: '<path d="M12 3L14.8 8.8L21 9.7L16.5 14.1L17.6 20.3L12 17.3L6.4 20.3L7.5 14.1L3 9.7L9.2 8.8Z"/>',
+  // Icones d'interfície (en lloc de símbols de text)
+  play: '<path d="M8 5.5V18.5L18.5 12Z" fill="currentColor"/>',
+  stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor"/>',
+  x: '<path d="M6 6L18 18M18 6L6 18"/>',
+  check: '<path d="M5 12.5L10 17.5L19 7"/>',
+  back: '<path d="M19 12H5M11 6L5 12L11 18"/>',
+  next: '<path d="M5 12H19M13 6L19 12L13 18"/>',
+  warn: '<path d="M12 3.5L21.5 20H2.5Z"/><path d="M12 10V14.5M12 17.4V17.5"/>'
 };
 const ic = k => IC[k] ? `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>` : '';
+const warnI = () => `<span class="wi">${ic('warn')}</span>`;
+// Avís dins la pàgina (en lloc de alert(), que trenca l'aspecte de l'app)
+let toastT;
+function toast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  t.innerHTML = ic('check') + '<span></span>'; t.lastChild.textContent = msg;
+  t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2400);
+}
 function toggleFirst(b) { const p = S.active.pick; p.first = !p.first; save(); b.classList.toggle('on', p.first); b.setAttribute('aria-pressed', !!p.first); }
 // Selecció amb icona i nom petit (mateix comportament que segPick)
 function tilePick(key, opts, val, cls) {
@@ -589,7 +607,7 @@ function viewGym(a) {
     <h2>${DAY_NAMES[r.day]}</h2>
     ${r.isToday ? '' : `<p><span class="tag warn">Proper dia</span></p>`}
     <ul class="list">${r.items.map((it, i) => `<li class="gymrow">
-      <button class="check ${done[i] ? 'on' : ''}" aria-label="Fet" onclick="toggleGym(${i})">${done[i] ? '✓' : ''}</button>
+      <button class="check ${done[i] ? 'on' : ''}" aria-label="Fet" onclick="toggleGym(${i})">${done[i] ? ic('check') : ''}</button>
       <span style="flex:1"><b>${exLabel(it.name)}</b></span>
       <input type="number" min="0" inputmode="decimal" placeholder="kg" style="width:72px" value="${load[i] || ''}" onchange="setGymLoad(${i},this.value)">
     </li>`).join('')}</ul>
@@ -635,7 +653,7 @@ function sessDetail(s) {
       ${delSessAsk === i
         ? `<span class="row" style="flex:none"><button class="small" onclick="askDelSession(-1)">Cancel·lar</button><button class="small sure" style="background:var(--bad);color:#fff" onclick="delSession(${i})">Esborrar</button></span>`
         : `<button class="small danger" style="flex:none" onclick="askDelSession(${i})">Esborrar</button>`}</div>
-    <p style="margin:6px 0"><span class="tag">${s.duration} min</span> <span class="tag">esforç ${s.rpe}</span> <span class="tag">fatiga ${s.fatigue}</span>${Array.isArray(s.warmup) ? ' <span class="tag ok">escalfament ✓</span>' : ''}${Object.entries(s.pain || {}).filter(([, v]) => v > 0).map(([k, v]) => ` <span class="tag ${v >= 5 ? 'bad' : 'warn'}">${k} ${v}</span>`).join('')}</p>
+    <p style="margin:6px 0"><span class="tag">${s.duration} min</span> <span class="tag">esforç ${s.rpe}</span> <span class="tag">fatiga ${s.fatigue}</span>${Array.isArray(s.warmup) ? ` <span class="tag ok">escalfament${ic('check')}</span>` : ''}${Object.entries(s.pain || {}).filter(([, v]) => v > 0).map(([k, v]) => ` <span class="tag ${v >= 5 ? 'bad' : 'warn'}">${k} ${v}</span>`).join('')}</p>
     ${s.garmin ? garminRow(s, i) : ''}
     ${(s.climbs || []).length ? `<p>${s.climbs.map(c => `<span class="tag ${c.result !== 'projecte' ? 'ok' : ''}">${dot(c.grade)}${c.grade}</span>`).join(' ')}</p>` : ''}
     ${(s.exercises || []).length ? `<p class="muted">${s.exercises.map(e => `${esc(e.name)}${e.sets ? ` ${e.sets}×${e.reps}` : ''}${e.load ? ` +${e.load}kg` : ''}`).join(' · ')}</p>` : ''}
@@ -915,7 +933,7 @@ function injRisk(name) {
     : j.phase === 3 ? HARD_FINGER.includes(name) : false);
 }
 const exIcon = n => EXIMG[n] ? `<img class="exi" src="exercicis/${EXIMG[n]}" alt="" loading="lazy">` : '';
-const exLabel = n => exIcon(n) + (injRisk(n) ? '⚠ ' : '') + esc(n);
+const exLabel = n => exIcon(n) + (injRisk(n) ? warnI() : '') + esc(n);
 function injChecks(j) { if (!j.checks || j.checks.date !== today()) j.checks = { date: today(), set: [] }; return j.checks.set; }
 const injPain = j => (j.pain && j.pain.date === today() ? j.pain.v : null);
 let injAdd = false, injAsk = '';
@@ -952,12 +970,12 @@ function viewRehab() {
     return `<div class="card rehab"><h2>Rehab · ${injName(j)}</h2>
     ${phaseBar(j.phase)}
     <p class="muted" style="margin:8px 0">Fase ${j.phase}/${REHAB.length} · ${ph.t}</p>
-    <ul class="list">${ph.ex.map((e, k) => `<li class="gymrow"><button class="check ${done.includes(k) ? 'on' : ''}" aria-label="Fet" onclick="toggleInjEx(${j.id},${k})">${done.includes(k) ? '✓' : ''}</button><span style="flex:1">${e}</span></li>`).join('')}</ul>
+    <ul class="list">${ph.ex.map((e, k) => `<li class="gymrow"><button class="check ${done.includes(k) ? 'on' : ''}" aria-label="Fet" onclick="toggleInjEx(${j.id},${k})">${done.includes(k) ? ic('check') : ''}</button><span style="flex:1">${e}</span></li>`).join('')}</ul>
     <label>Dolor avui (0-10)</label>
     <div class="scale" style="grid-template-columns:repeat(11,1fr);gap:3px">${[...Array(11)].map((_, v) => `<button style="font-size:13px" class="${p === v ? 'on' : ''}" onclick="setInjPain(${j.id},${v})">${v}</button>`).join('')}</div>
     ${p !== null && p >= 4 ? `<p><span class="tag bad">Dolor alt</span> <span class="muted">Avui sense càrrega al dit</span></p>` : ''}
     <p class="muted" style="margin:10px 0 4px">Evita ara</p><div class="chips">${ph.avoid.map(a => `<span class="tag bad">${a}</span>`).join('')}</div>
-    <p class="muted" style="margin:10px 0 0">⚠ = carrega el dit</p></div>`;
+    <p class="muted" style="margin:10px 0 0">${warnI()}= carrega el dit</p></div>`;
   }).join('');
 }
 // Apartat Lesions del Perfil: afegir, veure la fase, passar de fase i acabar
@@ -968,7 +986,7 @@ function viewInjuries() {
     <div><label>Dit</label>${sel('injfinger', INJ_FINGERS, 'Anular')}</div><div><label>Mà</label>${sel('injhand', INJ_HANDS, 'dreta')}</div></div>
     <p class="row"><button onclick="toggleInjAdd()">Cancel·lar</button><button class="primary" onclick="addInjury()">Començar</button></p>`;
   return `<div class="card"><h2>Lesions</h2>
-    ${n ? `<div class="stat" style="text-align:left;margin-bottom:10px"><b style="font-size:16px">Rehab completada ✓</b>
+    ${n ? `<div class="stat" style="text-align:left;margin-bottom:10px"><b style="font-size:16px">Rehab completada${ic('check')}</b>
       <p class="muted" style="margin:4px 0">${esc(n.name)} · per no recaure:</p>
       <ul style="margin:0 0 8px;padding-left:18px">${REHAB_PREVENT.map(t => `<li>${t}</li>`).join('')}</ul>
       <button class="small" onclick="dismissInjNotice()">Entesos</button></div>` : ''}
@@ -983,8 +1001,8 @@ function viewInjuries() {
           ? `<p>Recuperat? S'esborrarà del pla.</p><p class="row"><button onclick="askInj('')">Cancel·lar</button><button class="primary" onclick="injStep(${j.id},1)">Sí, acabar</button></p>`
           : injAsk === 'd' + j.id
             ? `<p>Esborrar lesió?</p><p class="row"><button onclick="askInj('')">Cancel·lar</button><button class="primary" style="background:var(--bad)" onclick="delInjury(${j.id})">Esborrar</button></p>`
-            : `<p class="row">${j.phase > 1 ? `<button onclick="injStep(${j.id},-1)">← Anterior</button>` : ''}
-              <button class="primary" onclick="${last ? `askInj('f${j.id}')` : `injStep(${j.id},1)`}">${last ? 'Finalitzar' : 'Següent →'}</button></p>
+            : `<p class="row">${j.phase > 1 ? `<button onclick="injStep(${j.id},-1)">${ic('back')}Anterior</button>` : ''}
+              <button class="primary" onclick="${last ? `askInj('f${j.id}')` : `injStep(${j.id},1)`}">${last ? 'Finalitzar' : 'Següent' + ic('next')}</button></p>
               <p style="margin:0"><button class="danger small" onclick="askInj('d${j.id}')">Esborrar lesió</button></p>`}
       </div>`;
     }).join('')}
@@ -1010,7 +1028,7 @@ function viewWeak() {
     ${l.length ? `<ul class="list presets" style="margin-top:8px">${l.map((w, i) => `<li><span>${esc(w.text)}<br><span class="muted">${dmy(w.date)}</span></span>
       ${weakAsk === i
         ? `<span class="pre"><button class="small" onclick="askDelWeak(-1)">Cancel·lar</button><button class="small sure" onclick="delWeak(${i})">Esborrar</button></span>`
-        : `<span class="pre"><button class="small danger" aria-label="Esborrar" onclick="askDelWeak(${i})">✕</button></span>`}</li>`).join('')}</ul>` : ''}
+        : `<span class="pre"><button class="small danger" aria-label="Esborrar" onclick="askDelWeak(${i})">${ic('x')}</button></span>`}</li>`).join('')}</ul>` : ''}
   </div>`;
 }
 
@@ -1180,7 +1198,7 @@ function viewWeight() {
     ${l.length ? `<ul class="list presets" style="margin-top:8px">${l.map((r, i) => ({ r, i })).reverse().slice(0, 5).map(({ r, i }) => `<li><span><b>${f1(r.kg)} kg</b><br><span class="muted">${dmy(r.date)}</span></span>
       ${wAsk === i
         ? `<span class="pre"><button class="small" onclick="askDelWeight(-1)">Cancel·lar</button><button class="small sure" onclick="delWeight(${i})">Esborrar</button></span>`
-        : `<span class="pre"><button class="small danger" aria-label="Esborrar" onclick="askDelWeight(${i})">✕</button></span>`}</li>`).join('')}</ul>` : ''}
+        : `<span class="pre"><button class="small danger" aria-label="Esborrar" onclick="askDelWeight(${i})">${ic('x')}</button></span>`}</li>`).join('')}</ul>` : ''}
   </div>`;
 }
 
@@ -1359,12 +1377,12 @@ function viewFingers() {
     ${l.length ? `<ul class="list presets">${l.map((r, i) => ({ r, i })).reverse().slice(0, 6).map(({ r, i }) => `<li><span><b>${sgn(r.kg)} kg</b> · ${r.mm} mm<br><span class="muted">${r.date.split('-').reverse().join('/')}</span></span>
       ${fingAsk === i
         ? `<span class="pre"><button class="small" onclick="askDelFinger(-1)">Cancel·lar</button><button class="small sure" onclick="delFinger(${i})">Esborrar</button></span>`
-        : `<span class="pre"><button class="small danger" aria-label="Esborrar" onclick="askDelFinger(${i})">✕</button></span>`}</li>`).join('')}</ul>` : ''}
+        : `<span class="pre"><button class="small danger" aria-label="Esborrar" onclick="askDelFinger(${i})">${ic('x')}</button></span>`}</li>`).join('')}</ul>` : ''}
   </div>`;
 }
 function saveProfile() {
   S.profile = { maxGrade: $('pg').value, goal: $('po').value, days: +$('pdays').value, start: $('pstart').value || today() };
-  save(); alert('Perfil desat'); go('plan');
+  save(); go('plan'); toast('Perfil desat');
 }
 function exportData() {
   const a = document.createElement('a');
@@ -1373,8 +1391,8 @@ function exportData() {
 }
 function importData(f) {
   if (!f) return;
-  f.text().then(t => { S = Object.assign(blank(), JSON.parse(t)); save(); alert('Dades importades'); go('home'); })
-    .catch(() => alert('Fitxer no vàlid'));
+  f.text().then(t => { S = Object.assign(blank(), JSON.parse(t)); save(); go('home'); toast('Dades importades'); })
+    .catch(() => toast('Fitxer no vàlid'));
 }
 
 // Actualització automàtica: busca una versió nova en obrir l'app, en tornar-hi i cada 30 min; quan n'hi ha, recarrega
