@@ -1,4 +1,4 @@
-/* Tinta (sumi), paper (washi) i vermell de segell (shu). Targetes planes, majúscules petites i números grans, com Garmin Connect. */
+﻿/* Tinta (sumi), paper (washi) i vermell de segell (shu). Targetes planes, majúscules petites i números grans, com Garmin Connect. */
 :root {
   --bg: #100f0e; --card: #1a1816; --card2: #262320; --line: #342f2a; --text: #efe8da; --muted: #9b9488;
   --accent: #d03a23; --accent-soft: #f0684c; --paper: #ece4d3; --ink: #14110f;
@@ -1162,3 +1162,52 @@ body.gwishing > :not(#gsheet) { visibility: hidden; }
 /* el full ja es quasi opac: el desenfocament de fons nomes costava rendiment */
 .gsheet { -webkit-backdrop-filter: none; backdrop-filter: none; }
 button, .card, nav#tabs button { touch-action: manipulation; }
+
+/* ================= Planetes i estels de la cinematica (nomes transform/opacity; apareixen a la part lenta) ================= */
+.wcos { position: absolute; inset: 0; pointer-events: none; }
+.wpl { position: absolute; left: var(--x); top: var(--y); width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); border-radius: 50%; opacity: 0;
+  background: radial-gradient(circle at 32% 30%, #fff 0, color-mix(in srgb, var(--pc) 80%, #fff) 12%, var(--pc) 40%, color-mix(in srgb, var(--pc) 32%, #000) 76%, #05060d 100%);
+  animation: wplin .9s cubic-bezier(.2, .8, .3, 1) var(--pd) both, wpld var(--pt) ease-in-out var(--pd) infinite alternate; }
+.wpl { box-shadow: 0 0 calc(var(--s) * .45) calc(var(--s) * .06) color-mix(in srgb, var(--pc) 45%, transparent); }
+.wpl.rg::after { content: ''; position: absolute; left: -48%; right: -48%; top: 36%; bottom: 36%; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--pc) 55%, #fff); transform: rotate(-20deg); opacity: .85; }
+@keyframes wplin { from { opacity: 0; scale: .2; } to { opacity: 1; scale: 1; } }
+@keyframes wpld { from { translate: 0 0; } to { translate: var(--dx) var(--dy); } }
+.wsp { position: absolute; left: var(--x); top: var(--y); width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); background: var(--sc, #fff); opacity: 0;
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  animation: wspin .45s ease-out var(--pd) both, wsptw var(--pt) ease-in-out calc(var(--pd) + .45s) infinite; }
+@keyframes wspin { from { opacity: 0; scale: 0; } to { opacity: 1; scale: 1; } }
+@keyframes wsptw { 50% { opacity: .35; scale: .55; } }
+@media (prefers-reduced-motion: reduce) { .wpl, .wsp { animation: none; opacity: .8; } }
+.wcircle polygon { stroke-width: 1.1; }
+
+/* ================= Revisio general: targetes de dades, historial i detalls ================= */
+.stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stat b { overflow-wrap: anywhere; line-height: 1.1; }
+.stat b small { font-size: .5em; font-weight: 700; color: var(--muted); letter-spacing: .02em; }
+.stat b.gb, .card:has(> .rings) .stat b.gb { font-size: 21px; line-height: 1.05; padding-top: 4px; }
+.stat b.gb small { display: block; font-size: 12px; margin-top: 3px; text-transform: lowercase; }
+svg .axis { font-size: 9px; font-weight: 600; }
+/* tendencia respecte als 30 dies anteriors */
+.stats.tot .stat { padding-bottom: 10px; }
+.tr { display: inline-block; margin-top: 7px; padding: 2px 7px; border-radius: 99px; font-style: normal; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tr.up { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.tr.dn { color: var(--muted); background: rgba(255, 255, 255, .06); }
+/* ultimes sessions */
+.list.recent li { padding: 0; }
+.list.recent li:last-child { border-bottom: 0; }
+.rs { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 2px; background: none; border: 0; box-shadow: none; color: inherit; text-align: left; border-radius: 10px; }
+.rs:active { background: rgba(255, 255, 255, .04); transform: none; }
+.rs > svg { width: 16px; height: 16px; flex: none; color: var(--muted); }
+.rsd { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-content: center; text-align: center; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
+.rsd b { font-size: 17px; line-height: 1; font-weight: 800; }
+.rsd small { font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--accent-soft); margin-top: 3px; }
+.rsm { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.rsm b { font-size: 15px; }
+.rsm small { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rsg { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; padding: 4px 9px 4px 7px; border-radius: 99px; background: rgba(255, 255, 255, .05); white-space: nowrap; }
+.itvtot { text-align: center; margin: -4px 0 12px; font-size: 13px; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+/* textos que no es poden seleccionar sense voler en botons i etiquetes */
+button, nav#tabs, .hero, .card h2 { -webkit-user-select: none; user-select: none; }
+img { -webkit-user-drag: none; }
+.tr { display: table; margin: 7px auto 0; }
+.card > .seg + details { margin-top: 12px; }

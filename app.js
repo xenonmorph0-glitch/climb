@@ -163,7 +163,7 @@ function cardArt(root = document.getElementById('view')) {
 }
 // Actualitza el DOM només on ha canviat (així en tocar un botó no es reinicia la pantalla ni les animacions, i es conserva el scroll)
 function syncAttrs(a, b) {
-  for (const at of [...a.attributes]) if (!b.hasAttribute(at.name)) a.removeAttribute(at.name);
+  for (const at of [...a.attributes]) if (!b.hasAttribute(at.name) && !(a.nodeName === 'DETAILS' && at.name === 'open')) a.removeAttribute(at.name);   // un desplegable obert pel dit es manté obert
   for (const at of b.attributes) if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
 }
 function morph(a, b) {
@@ -198,7 +198,9 @@ function render() {
   const gt = document.querySelector('.gtabs'); if (gt) gt.scrollLeft = planTabX;
   profileFx();
   if (tab === 'timer') itvSync(itvRun ? (itvRun.end - Date.now()) / 1000 : 0);
-  if (tab === 'session' && S.active) ticker = setInterval(tick, 250);
+  // El rellotge i el descans es posen al valor real al moment (si no, quedarien a 00:00 fins al següent tic de 250 ms)
+  if (tab === 'session' && S.active) { tick(); ticker = setInterval(tick, 250); }
+  wakeSync();
 }
 
 // ---------- Inici ----------
@@ -244,10 +246,14 @@ function viewHome() {
     <button class="small" onclick="go('plan')">Obrir</button></div>`).join('')}
   <div class="card">
     <h2>Estat</h2>
-    <div class="rings">${ring(st.thisWeek / target, `${st.thisWeek}/${target}`, 'Setmana', 'var(--accent-soft)')}${ring(m.acwr / 2, m.acwr ? m.acwr.toFixed(1) : '—', 'Càrrega', loadColor)}${ring(rAvg ? rAvg / 5 : 0, rAvg ? rAvg.toFixed(1) : '—', 'Recuperació', 'var(--ok)')}</div>
+    <div class="rings">${ring(st.thisWeek / target, `${st.thisWeek}/${target}`, 'Setmana', 'var(--accent-soft)')}${ring(m.acwr / 2, m.acwr ? m.acwr.toFixed(1) : '—', 'Càrrega', loadColor)}${rAvg ? ring(rAvg / 5, rAvg.toFixed(1), 'Recuperació', 'var(--ok)') : (() => {
+      // Sense dades de recuperació: % de vies fetes a la primera (flash) dels últims 30 dies
+      const cl = S.sessions.filter(s => daysAgo(s.date) < 30).flatMap(s => s.climbs || []), fl = cl.length ? cl.filter(c => c.result === 'flash').length / cl.length : 0;
+      return ring(fl, cl.length ? Math.round(fl * 100) + '%' : '—', 'Flash', 'var(--ok)', '閃');
+    })()}</div>
     <div class="stats">
       <div class="stat"><div class="g7" aria-hidden="true">${d7.map(on => `<i class="${on ? 'on' : ''}"></i>`).join('')}</div><b>${m.count7}</b><span>7 dies</span></div>
-      <div class="stat"><div class="gl" aria-hidden="true">${GRADES.map((g, i) => `<i style="height:${6 + i * 1.4}px;${i <= bi ? `background:${COLORS[g.split(' ')[0]]}` : ''}"></i>`).join('')}</div><b>${m.best}</b><span>millor</span></div>
+      <div class="stat"><div class="gl" aria-hidden="true">${GRADES.map((g, i) => `<i style="height:${6 + i * 1.4}px;${i <= bi ? `background:${COLORS[g.split(' ')[0]]}` : ''}"></i>`).join('')}</div>${bi < 0 ? '<b>—</b>' : `<b class="gb">${m.best.split(' ')[0]}<small>${m.best.split(' ').slice(1).join(' ')}</small></b>`}<span>millor</span></div>
       <div class="stat"><svg class="flame${st.streak ? '' : ' off'}" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="flg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#d03a23"/><stop offset=".6" stop-color="#ee6a2c"/><stop offset="1" stop-color="#f2b84b"/></linearGradient></defs><path d="M12 1.5c.6 4.2 6.2 6.6 6.2 12.7a6.2 6.2 0 0 1-12.4 0c0-3 1.8-4.6 2.4-7.4 1.9 1.1 3 2.3 3.2 4.3 1.2-2.6 1.1-6.2.6-9.6z" fill="url(#flg)"/><path d="M12 22.2a3.3 3.3 0 0 1-3.3-3.3c0-2.1 1.9-3.2 3.3-5.3 1.4 2.1 3.3 3.2 3.3 5.3a3.3 3.3 0 0 1-3.3 3.3z" fill="#f7dc8a"/></svg><b>${st.streak}</b><span>ratxa</span></div>
     </div>
     <p class="muted"><span class="tag ${cls}">${state}</span>${m.pain >= 5 ? ` <span class="tag bad">Dolor ${m.pain}/10</span>` : ''}</p>
@@ -313,8 +319,8 @@ function wzPhase(p, sec) { wz.phase = p; wz.dur = sec; wz.end = sec ? Date.now()
 function wzLoop() { clearInterval(wzTimer); wzTimer = setInterval(wzTick, 100); }
 // Primer una pantalla d'inici (llista d'exercicis) on s'accepta començar; després tot va sol
 function wzStart() { clearInterval(wzTimer); wzAsk = false; wz ={ i: 0, set: 1, enter: true, phase: 'intro', end: 0 }; }
-function wzBegin() { wz.enter = true; wzPhase('ready', WZ_READY); wzLoop(); wzDraw(); }
-function wzStop() { clearInterval(wzTimer); wz = null; }
+function wzBegin() { wz.enter = true; wzPhase('ready', WZ_READY); wzLoop(); wzDraw(); wakeSync(); }
+function wzStop() { clearInterval(wzTimer); wz = null; wakeSync(); }
 function wzAdvance() {
   wz.i++; wz.set = 1; wz.enter = true;
   if (wz.i >= WARMUP.length) { wz.phase = 'done'; wz.end = 0; clearInterval(wzTimer); wzChime([523, 659, 784, 1047]); }
@@ -439,10 +445,27 @@ if (!Array.isArray(itvPresets)) itvPresets = [];
 function saveItv() {
   try { localStorage.setItem(ITV_KEY, JSON.stringify(itv)); localStorage.setItem(PRE_KEY, JSON.stringify(itvPresets)); } catch {}
 }
+// Durada total de l'entrenament d'intervals (sense els 3 s de preparació)
+function itvTotal() {
+  const t = itv.sets * (itv.reps * itv.work + (itv.reps - 1) * itv.rest) + (itv.sets - 1) * itv.setRest;
+  return `Total ${fmt(t)} · ${itv.sets * itv.reps} ${itv.sets * itv.reps === 1 ? 'repetició' : 'repeticions'}`;
+}
 function setItv(k, el) {
   const v = Math.max(ITV_MIN[k], Math.min(k === 'reps' || k === 'sets' ? 99 : 3600, parseInt(el.value) || 0));
   itv[k] = v; el.value = v; saveItv();
+  const t = $('itvTot'); if (t) t.textContent = itvTotal();
+  if (!itvRun) itvSync();
 }
+// Pantalla encesa mentre hi ha una sessió, l'escalfament o el temporitzador en marxa (si el navegador ho permet)
+let wakeL = null;
+async function wakeSync() {
+  const want = !!(S.active || itvRun || (wz && wz.phase !== 'intro' && wz.phase !== 'done'));
+  try {
+    if (want && !wakeL && 'wakeLock' in navigator && document.visibilityState === 'visible') { wakeL = await navigator.wakeLock.request('screen'); wakeL.addEventListener('release', () => { wakeL = null; }); }
+    else if (!want && wakeL) { const w = wakeL; wakeL = null; await w.release(); }
+  } catch {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wakeSync(); });
 // Ajustos amb nom: es guarden, es carreguen i s'esborren; el mateix nom els substitueix
 function savePreset() {
   const name = $('itvName').value.trim();
@@ -465,9 +488,9 @@ function itvStart() {
   if (itvRun) return itvStop();
   itvDone = false;
   itvRun = { phase: 'ready', rep: 1, set: 1, end: Date.now() + 3000, last: null };
-  itvTimer = setInterval(itvTick, 200); itvTick();
+  itvTimer = setInterval(itvTick, 200); itvTick(); wakeSync();
 }
-function itvStop() { clearInterval(itvTimer); itvRun = null; itvSync(); }
+function itvStop() { clearInterval(itvTimer); itvRun = null; itvSync(); wakeSync(); }
 function itvTick() {
   if (!itvRun) return;
   const r = itvRun;
@@ -503,6 +526,7 @@ function viewItv() {
     <div class="row">${f('work', 'Treball (s)')}${f('rest', 'Descans (s)')}${f('reps', 'Repeticions')}</div>
     <div class="row">${f('sets', 'Sèries')}${f('setRest', 'Descans sèries (s)')}</div>
     <div class="timer" id="itvDisp">${fmt(itv.work)}</div>
+    <p class="muted itvtot" id="itvTot">${itvTotal()}</p>
     <button class="primary" id="itvBtn" style="width:100%" onclick="itvStart()">${ic('play')}Iniciar</button></div>
   <div class="card"><h2>Ajustos desats</h2>
     <div class="row"><input id="itvName" placeholder="Nom (ex. Penjades 7/3)" maxlength="30"><button class="small" style="flex:none" onclick="savePreset()">Desar</button></div>
@@ -734,7 +758,34 @@ function sessDetail(s) {
     ${s.notes ? `<p class="muted">“${esc(s.notes)}”</p>` : ''}
   </div>`;
 }
-function viewHistory() { return calOpen ? viewDay(calOpen) : viewCalendar() + viewProgress(); }
+function viewHistory() { return calOpen ? viewDay(calOpen) : viewCalendar() + viewProgress() + viewTotals() + viewRecent(); }
+// Resum dels últims 30 dies comparat amb els 30 anteriors
+function viewTotals() {
+  if (!S.sessions.length) return '';
+  const rng = (a, b) => S.sessions.filter(s => { const d = daysAgo(s.date); return d >= a && d < b; });
+  const sum = ss => ({ n: ss.length, min: ss.reduce((a, s) => a + (s.duration || 0), 0), vies: ss.reduce((a, s) => a + (s.climbs || []).length, 0) });
+  const c = sum(rng(0, 30)), p = sum(rng(30, 60));
+  const tr = (a, b) => !b || a === b ? '' : `<em class="tr ${a > b ? 'up' : 'dn'}">${a > b ? '▲' : '▼'} ${Math.abs(Math.round((a - b) / b * 100))} %</em>`;
+  const h = c.min >= 60 ? `${Math.floor(c.min / 60)}<small> h </small>${c.min % 60 ? pad2(c.min % 60) : ''}` : `${c.min}<small> min</small>`;
+  return `<div class="card"><h2>Últims 30 dies</h2><div class="stats tot">
+    <div class="stat"><b>${c.n}</b><span>sessions</span>${tr(c.n, p.n)}</div>
+    <div class="stat"><b>${h}</b><span>temps</span>${tr(c.min, p.min)}</div>
+    <div class="stat"><b>${c.vies}</b><span>vies</span>${tr(c.vies, p.vies)}</div></div></div>`;
+}
+// Últimes sessions: un toc obre el dia
+let recentAll = false;
+function viewRecent() {
+  if (!S.sessions.length) return '';
+  const ss = S.sessions.slice().sort((a, b) => (a.date < b.date ? 1 : -1)), show = recentAll ? ss.slice(0, 40) : ss.slice(0, 5);
+  const row = s => {
+    const d = new Date(s.date + 'T00:00:00'), cl = s.climbs || [], best = cl.length ? GRADES[Math.max(...cl.map(c => gi(c.grade)))] : null, n = cl.length || (s.exercises || []).length;
+    return `<li><button class="rs" onclick="calPick('${s.date}')"><span class="rsd"><b>${d.getDate()}</b><small>${MONTHS[d.getMonth()].slice(0, 3)}</small></span>
+      <span class="rsm"><b>${TYPES[s.type] || 'Sessió'}</b><small>${s.duration ? s.duration + ' min' : ''}${s.duration && n ? ' · ' : ''}${n ? `${n} ${cl.length ? (n === 1 ? 'via' : 'vies') : (n === 1 ? 'exercici' : 'exercicis')}` : ''}</small></span>
+      ${best ? `<span class="rsg">${dot(best)}${best}</span>` : ''}${ic('right')}</button></li>`;
+  };
+  return `<div class="card"><h2>Últimes sessions</h2><ul class="list recent">${show.map(row).join('')}</ul>
+    ${ss.length > 5 ? `<button class="small" style="width:100%;margin-top:10px" onclick="recentAll=!recentAll;render()">${recentAll ? 'Veure\'n menys' : `Veure-les totes (${ss.length})`}</button>` : ''}</div>`;
+}
 // Pàgina del dia: resum de tot el que vas fer aquell dia; la fletxa torna al calendari
 const dayLong = ds => { const d = new Date(ds + 'T00:00:00'); return `${DAY_NAMES[(d.getDay() + 6) % 7]} ${d.getDate()} de ${MONTHS[d.getMonth()].toLowerCase()}`; };
 function viewDay(ds) {
@@ -832,6 +883,8 @@ function viewProgress() {
       <text x="2" y="${Y(hi) - 4}" class="axis">${GRADES[hi]}</text>
       <text x="2" y="${Y(lo) - 4}" class="axis">${GRADES[lo]}</text>
       <line x1="2" x2="298" y1="${Y(hi)}" y2="${Y(hi)}" class="grid"/><line x1="2" x2="298" y1="${Y(lo)}" y2="${Y(lo)}" class="grid"/>
+      <defs><linearGradient id="prg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent-soft)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent-soft)" stop-opacity="0"/></linearGradient></defs>
+      ${pts.length > 1 ? `<polygon points="${pts[0][0]},104 ${pts.map(p => p[0] + ',' + p[1]).join(' ')} ${pts[pts.length - 1][0]},104" fill="url(#prg)"/>` : ''}
       <polyline points="${pts.map(p => p[0] + ',' + p[1]).join(' ')}" fill="none" stroke="var(--accent-soft)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
       ${pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="${pr}" fill="${COLORS[GRADES[p[2]].split(' ')[0]]}" stroke="var(--card)" stroke-width="${pr > 4 ? 2 : 1}"/>`).join('')}
       <line x1="${X(0)}" x2="${X(W - 1)}" y1="112" y2="112" stroke="var(--line)" stroke-width="1" stroke-dasharray="1.5 3"/>
@@ -1423,12 +1476,13 @@ function gStarsShadow(n, big) {
   return [...Array(n)].map(() => `${(gRand() * 100).toFixed(1)}vw ${(gRand() * 100).toFixed(1)}vh 0 ${(gRand() * (big ? 1.2 : .6)).toFixed(1)}px rgba(255,255,255,${(.35 + gRand() * .65).toFixed(2)})`).join(',');
 }
 function gCircleSvg() {
-  const oct = [0, 3, 6, 1, 4, 7, 2, 5].map(j => { const a = (j * 45 - 90) * Math.PI / 180; return `${(58 * Math.cos(a)).toFixed(1)},${(58 * Math.sin(a)).toFixed(1)}`; }).join(' ');
+  // Heptagrama regular {7/3}: set puntes, una cap amunt, inscrites al cercle de punts (r=62)
+  const oct = [0, 3, 6, 2, 5, 1, 4].map(j => { const a = (j * 360 / 7 - 90) * Math.PI / 180; return `${(62 * Math.cos(a)).toFixed(2)},${(62 * Math.sin(a)).toFixed(2)}`; }).join(' ');
   const runes = [...W_RUNES].map((c, j) => `<text x="0" y="-70" text-anchor="middle" transform="rotate(${j * (360 / W_RUNES.length)})">${c}</text>`).join('');
   return `<svg class="wcircle" viewBox="-100 -100 200 200" aria-hidden="true">
     <g class="cg a"><circle class="dr" r="94"/><circle r="89" stroke-dasharray="1.5 4.5"/></g>
     <g class="cg b">${runes}<circle class="dr" r="80"/><circle r="62" stroke-dasharray="3 3"/></g>
-    <g class="cg c"><polygon class="dr" points="${oct}"/><circle class="dr" r="30"/></g></svg>`;
+    <g class="cg c"><polygon class="dr" pathLength="620" stroke-linejoin="miter" points="${oct}"/><circle class="dr" r="22"/></g></svg>`;
 }
 function gRip(col) {
   const c = document.querySelector('#gsheet .wrips'); if (!c) return;
@@ -1458,6 +1512,16 @@ function gWishStart(res) {
   }).join('');
   const tun = [...Array(26)].map((_, k) => `<i style="--a:${Math.round(k * 14 + (k % 3) * 3)}deg;--dl:${(((k * 37) % 100) / 100 * Math.min(T, 1.6) * .5).toFixed(2)}s"></i>`).join('');
   const petals = [...Array(12)].map(() => `<i style="--x:${(gRand() * 100).toFixed(1)}vw;--w:${(7 + gRand() * 9).toFixed(1)}px;--du:${(7 + gRand() * 6).toFixed(1)}s;--dl:${(-gRand() * 8).toFixed(1)}s;--dx:${((gRand() - .5) * 40).toFixed(0)}vw"></i>`).join('');
+  // Planetes i estels que apareixen durant la part lenta: com més rara és la millor esfera, més n'hi ha i més grans
+  const nPl = best < 3 ? 0 : best < 5 ? 1 : best < 7 ? 2 : best < 9 ? 3 : 4, nSp = best < 3 ? 0 : 5 + (best - 3) * 2;
+  const slots = [[16, 13], [84, 20], [14, 84], [86, 79]], big = best >= 7;
+  const cosmos = [...Array(nPl)].map((_, k) => {
+    const c = G_TIERS[Math.min(best, 3 + k * 2 > 9 ? 9 : 3 + k * 2)][2], s = (big ? 13 : 10) + gRand() * 5, pd = ts + te * (.08 + .2 * k);
+    return `<i class="wpl${(k % 2 === 1 || best >= 6) ? ' rg' : ''}" style="--x:${slots[k][0]}%;--y:${slots[k][1]}%;--s:${s.toFixed(1)}vmin;--pc:${c};--pd:${pd.toFixed(2)}s;--pt:${(7 + gRand() * 5).toFixed(1)}s;--dx:${((gRand() - .5) * 5).toFixed(1)}vmin;--dy:${((gRand() - .5) * 5).toFixed(1)}vmin"></i>`;
+  }).join('') + [...Array(nSp)].map((_, k) => {
+    const c = k % 3 === 0 ? G_TIERS[best][2] : '#ffffff', s = (best >= 6 ? 10 : 7) + gRand() * (best >= 6 ? 14 : 8), pd = ts + te * gRand() * .85;
+    return `<i class="wsp" style="--x:${(4 + gRand() * 92).toFixed(1)}%;--y:${(4 + gRand() * 86).toFixed(1)}%;--s:${s.toFixed(1)}px;--sc:${c};--pd:${pd.toFixed(2)}s;--pt:${(1.4 + gRand() * 1.6).toFixed(2)}s"></i>`;
+  }).join('');
   const dots = items.map((_, k) => `<i style="--dc:${cols[k]}"></i>`).join('');
   const extra = (best >= 5 ? '<div class="wbolt"></div>' : '') + (best >= 6 ? '<div class="wbeam"></div><div class="wshock"></div><div class="wshock s2"></div><div class="wshock s3"></div>' : '') + (best >= 8 ? '<div class="wvig"></div>' : '');
   gSheet(`<div class="gwish lv${best} ${best >= 3 ? 'shk' : ''}" style="--T:${T.toFixed(2)}s;--ts:${ts.toFixed(2)}s;--te:${te.toFixed(2)}s;--c1:${G_TIERS[0][2]};--sh:${[0, 0, 0, 3, 4, 5, 7, 9, 11, 13][best]}px;--e:0">
@@ -1466,6 +1530,7 @@ function gWishStart(res) {
     <div class="wst s1" style="box-shadow:${gStarsShadow(30)}"></div><div class="wst s2" style="box-shadow:${gStarsShadow(20)}"></div><div class="wst s3" style="box-shadow:${gStarsShadow(10, true)}"></div>
     <div class="wkan" lang="ja" aria-hidden="true">運</div>
     <div class="wpet" aria-hidden="true">${petals}</div>
+    ${cosmos ? `<div class="wcos" aria-hidden="true">${cosmos}</div>` : ''}
     ${gCircleSvg()}
     <div class="wtun">${tun}</div>${extra}<div class="wring"></div>
     <div class="wcore"><i></i></div>
