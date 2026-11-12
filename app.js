@@ -1369,10 +1369,12 @@ function gSheet(html, cls = '', style = '') {
   let s = document.getElementById('gsheet');
   if (!s) { s = document.createElement('div'); s.id = 'gsheet'; document.body.appendChild(s); document.addEventListener('keydown', e => { if (e.key === 'Escape') gClose(); }); }
   s.className = 'gsheet ' + cls; s.setAttribute('style', style); s.innerHTML = html; s.hidden = false; document.body.classList.add('gopen');
+  // Durant la cinemàtica es deixa de pintar la resta de l'app (queda tapada): menys feina per al mòbil
+  document.body.classList.toggle('gwishing', cls === 'wish');
   return s;
 }
 function gTimersOff() { if (gW && gW.timers) gW.timers.forEach(clearTimeout); }
-function gClose() { gTimersOff(); const s = document.getElementById('gsheet'); if (s) s.hidden = true; document.body.classList.remove('gopen'); clearTimeout(gT); if (tab === 'profile') render(); }
+function gClose() { gTimersOff(); const s = document.getElementById('gsheet'); if (s) s.hidden = true; document.body.classList.remove('gopen', 'gwishing'); clearTimeout(gT); if (tab === 'profile') render(); }
 let gT;
 // ---- Tirada estil "wish": cinemàtica neutra (sense pistes) → esferes una a una (de menys a més rara) → resum ----
 let gW = null;
@@ -1403,13 +1405,13 @@ function gWishStart(res) {
   const nImp = Math.min(3, asc.filter(r => gTi(r.i) >= 3).length);
   const fast = asc.slice(0, asc.length - nImp), slow = asc.slice(asc.length - nImp);
   const items = [];
-  fast.forEach((r, k) => items.push({ r, dl: .04 + k * .03, du: .3 }));
-  const fastEnd = fast.length ? .04 + (fast.length - 1) * .03 + .3 : .25;
-  let cur = Math.max(fastEnd, .35), firstSlow = null;
-  slow.forEach(r => { const ti = gTi(r.i), du = .6 + .09 * ti; if (firstSlow === null) firstSlow = cur; items.push({ r, dl: cur, du }); cur += du * .92 + .22 + .05 * ti; });
+  fast.forEach((r, k) => items.push({ r, dl: .12 + k * .07, du: .5 }));
+  const fastEnd = fast.length ? .12 + (fast.length - 1) * .07 + .5 : .45;
+  let cur = Math.max(fastEnd, .65), firstSlow = null;
+  slow.forEach(r => { const ti = gTi(r.i), du = .9 + .12 * ti; if (firstSlow === null) firstSlow = cur; items.push({ r, dl: cur, du }); cur += du * .92 + .4 + .08 * ti; });
   const lastArr = items.reduce((m, it) => Math.max(m, it.dl + it.du * .92), 0);
-  const hold = nImp ? .55 + .1 * best : .12;
-  const T = Math.min(8, lastArr + hold), ts = firstSlow === null ? Math.max(.2, T - .6) : firstSlow, te = Math.max(.5, T - ts - .45);
+  const hold = nImp ? .9 + .14 * best : .35;
+  const T = Math.min(10.5, lastArr + hold), ts = firstSlow === null ? Math.max(.3, T - .8) : firstSlow, te = Math.max(.7, T - ts - .55);
   gW = { res: res.slice().sort((a, b) => gTi(a.i) - gTi(b.i) || a.i - b.i), k: 0, n, ready: 0, timers: [] };
   const cols = items.map(it => G_TIERS[gTi(it.r.i)][2]);
   const bc = best === 9 ? '#ffffff' : G_TIERS[best][2];
@@ -1417,13 +1419,13 @@ function gWishStart(res) {
     const sx = (gRand() - .5) * W * 1.4, sy = -H * (.55 + gRand() * .25), a = Math.atan2(-sy, -sx) * 180 / Math.PI;
     return `<i class="${gTi(it.r.i) === 9 ? 'rb' : ''}" style="--mc:${cols[k]};--sx:${sx.toFixed(0)}px;--sy:${sy.toFixed(0)}px;--rot:${a.toFixed(1)}deg;--dl:${it.dl.toFixed(3)}s;--du:${it.du.toFixed(3)}s"></i>`;
   }).join('');
-  const tun = [...Array(44)].map((_, k) => `<i style="--a:${Math.round(k * 8 + (k % 3) * 3)}deg;--dl:${(((k * 37) % 100) / 100 * Math.min(T, 1.2) * .5).toFixed(2)}s"></i>`).join('');
-  const petals = [...Array(24)].map(() => `<i style="--x:${(gRand() * 100).toFixed(1)}vw;--w:${(7 + gRand() * 9).toFixed(1)}px;--du:${(7 + gRand() * 6).toFixed(1)}s;--dl:${(-gRand() * 8).toFixed(1)}s;--dx:${((gRand() - .5) * 40).toFixed(0)}vw"></i>`).join('');
+  const tun = [...Array(26)].map((_, k) => `<i style="--a:${Math.round(k * 14 + (k % 3) * 3)}deg;--dl:${(((k * 37) % 100) / 100 * Math.min(T, 1.6) * .5).toFixed(2)}s"></i>`).join('');
+  const petals = [...Array(12)].map(() => `<i style="--x:${(gRand() * 100).toFixed(1)}vw;--w:${(7 + gRand() * 9).toFixed(1)}px;--du:${(7 + gRand() * 6).toFixed(1)}s;--dl:${(-gRand() * 8).toFixed(1)}s;--dx:${((gRand() - .5) * 40).toFixed(0)}vw"></i>`).join('');
   const dots = items.map((_, k) => `<i style="--dc:${cols[k]}"></i>`).join('');
   const extra = (best >= 5 ? '<div class="wbolt"></div>' : '') + (best >= 6 ? '<div class="wbeam"></div><div class="wshock"></div><div class="wshock s2"></div><div class="wshock s3"></div>' : '') + (best >= 8 ? '<div class="wvig"></div>' : '');
   gSheet(`<div class="gwish lv${best} ${best >= 3 ? 'shk' : ''}" style="--T:${T.toFixed(2)}s;--ts:${ts.toFixed(2)}s;--te:${te.toFixed(2)}s;--c1:${G_TIERS[0][2]};--sh:${[0, 0, 0, 3, 4, 5, 7, 9, 11, 13][best]}px;--e:0">
     <div class="wsky"></div>
-    <div class="wst s1" style="box-shadow:${gStarsShadow(46)}"></div><div class="wst s2" style="box-shadow:${gStarsShadow(34)}"></div><div class="wst s3" style="box-shadow:${gStarsShadow(16, true)}"></div>
+    <div class="wst s1" style="box-shadow:${gStarsShadow(30)}"></div><div class="wst s2" style="box-shadow:${gStarsShadow(20)}"></div><div class="wst s3" style="box-shadow:${gStarsShadow(10, true)}"></div>
     <div class="wkan" lang="ja" aria-hidden="true">運</div>
     <div class="wpet" aria-hidden="true">${petals}</div>
     ${gCircleSvg()}
@@ -1443,7 +1445,7 @@ function gWishStart(res) {
   gW.timers.push(setTimeout(() => { const w = document.querySelector('#gsheet .gwish'); if (w) w.classList.add('implode'); }, Math.max(0, T - .8) * 1000));
   // El color de l'escena comença neutre i puja per les categories: les baixes ràpid, les altes durant el final lent
   for (let j = 1; j <= best; j++) {
-    const at = j <= 2 || nImp === 0 ? .05 + .1 * j : ts + te * (.12 + .7 * (j - 3) / Math.max(1, best - 3));
+    const at = j <= 2 || nImp === 0 ? .12 + .2 * j :ts + te * (.12 + .7 * (j - 3) / Math.max(1, best - 3));
     gW.timers.push(setTimeout(() => {
       const w = document.querySelector('#gsheet .gwish'); if (!w) return;
       w.style.setProperty('--c1', j === 9 ? '#ffffff' : G_TIERS[j][2]); if (j === 9) w.classList.add('rbw');

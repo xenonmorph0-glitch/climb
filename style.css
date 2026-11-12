@@ -1086,3 +1086,37 @@ main { padding-top: 2px; }
 @keyframes wshake2 { 0%, 100% { transform: none; } 12% { transform: translate(calc(var(--sh) * -1), calc(var(--sh) * .6)); } 28% { transform: translate(var(--sh), calc(var(--sh) * -.7)); } 44% { transform: translate(calc(var(--sh) * -.7), calc(var(--sh) * -.5)); } 62% { transform: translate(calc(var(--sh) * .8), calc(var(--sh) * .7)); } 80% { transform: translate(calc(var(--sh) * -.4), calc(var(--sh) * .3)); } }
 .wflash { animation: wfl2 .55s ease-in calc(var(--T) - .55s) both; }
 @keyframes wfl2 { 0% { opacity: 0; } 55% { opacity: .95; } 100% { opacity: 1; } }
+
+/* ================= Optimitzacio de la cinematica (menys repintat, nomes transform/opacity) + ritme una mica mes lent ================= */
+/* Cap desenfocament de fons darrere la cinematica (era molt car): el cel ja es opac */
+.gsheet.wish { -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* Mentre dura la cinematica, la resta de l'app no es pinta ni s'anima */
+body.gwishing > :not(#gsheet) { visibility: hidden; }
+.gwish { contain: paint; transition: none; }
+.gwish > * { will-change: transform, opacity; }
+/* El color va per passos (animar un color registrat repintava tota la pantalla a cada fotograma) */
+@keyframes wsky2 { from { transform: scale(1.35); } to { transform: scale(.85); } }
+.wsky, .gwish.lv9 .wsky { animation: wsky2 var(--T) ease-in forwards; }
+@keyframes otw { 50% { opacity: .55; } }
+.wkan { filter: none; }
+.wtun i { animation-duration: .75s; }
+/* cercle: sense ombra filtrada (repintava tot l'SVG a cada fotograma) */
+.wcircle, .gwish.lv9 .wcircle { filter: none; stroke-width: .95; }
+.gwish .wcircle, .gwish.lv9 .wcircle { animation: wcircin .6s cubic-bezier(.3, .7, .3, 1) both, wcircout .6s ease-in calc(var(--T) - .6s) forwards; }
+.wcircle .dr { animation: wdraw .55s ease-out .03s forwards; }
+.wcircle .cg.c { animation: none; }
+/* petals: sense ombra */
+.gwish .wpet i, .gwish.lv4 .wpet i, .gwish.lv5 .wpet i, .gwish.lv6 .wpet i, .gwish.lv7 .wpet i, .gwish.lv8 .wpet i, .gwish.lv9 .wpet i { box-shadow: none; }
+/* anell: l'ombra es fixa i nomes s'anima transform/opacitat */
+@keyframes wring3 { 0% { transform: scale(.2); opacity: 0; } 35% { opacity: 0; } 65% { opacity: .75; } 100% { transform: scale(1.1); opacity: 1; } }
+.wring { border: 2px solid color-mix(in srgb, var(--c1) 70%, #fff); box-shadow: 0 0 30px 6px color-mix(in srgb, var(--c1) 55%, transparent); animation: wring3 var(--te) ease-in var(--ts) both; }
+/* feix: amplada fixa i s'escala (abans animava width = recalcul de layout) */
+.wbeam { width: 70vmin; margin-left: -35vmin; filter: none; transform-origin: 50% 50%; }
+@keyframes wbeam3 { 0%, 52% { transform: scaleX(0); opacity: 0; } 76% { transform: scaleX(.2); opacity: .85; } 100% { transform: scaleX(1); opacity: 1; } }
+.wbeam { animation: wbeam3 var(--te) ease-in var(--ts) both; }
+.wcore i { filter: none; }
+.wrips i { box-shadow: 0 0 10px var(--mc); animation-duration: .8s; }
+.wmet i { box-shadow: 0 0 10px 2px color-mix(in srgb, var(--mc, #fff) 70%, transparent); }
+.wmet i::after { box-shadow: 0 0 10px 3px var(--mc); }
+/* arc de Sant Martin de l'unic: sense barreja de modes */
+.gwish.rbw::after { mix-blend-mode: normal; opacity: .14; will-change: transform; }
