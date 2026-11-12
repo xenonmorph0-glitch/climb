@@ -3,7 +3,7 @@
 const COLORS = { Verd: '#3fa34d', Blau: '#2f6fd6', Lila: '#8e55c9', 'Marró': '#8a5a35', Vermell: '#d63a3a', Blanc: '#f2f2f2' };
 const LEVELS = ['fàcil', 'difícil'];
 const GRADES = Object.keys(COLORS).flatMap(c => LEVELS.map(l => `${c} ${l}`));
-const TYPES = { escalada: 'Escalada', gym: 'Gym' };
+const TYPES = { escalada: 'Escalada', gym: 'Gym', casa: 'A casa' };
 const dot = g => `<span class="dot" style="background:${COLORS[g.split(' ')[0]] || '#888'}"></span>`;
 const RESULTS = { flash: 'Flash', semiflash: 'Semiflash', noflash: 'No flash' };
 const STYLES = { bloc: 'Bloc', autos: 'Autos' };
@@ -110,7 +110,7 @@ function leaveGhost(dir) {
 function go(t) {
   const dir = TAB_ORDER.indexOf(t) >= TAB_ORDER.indexOf(tab) ? 1 : -1, same = t === tab;
   if (!same && !matchMedia('(prefers-reduced-motion: reduce)').matches) leaveGhost(dir);
-  tab = t; planOff = {}; if (t !== 'history') calOpen = null;
+  tab = t; planOff = {}; pd = null; profEdit = false; if (t !== 'history') calOpen = null;
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   { const bs = [...document.querySelectorAll('#tabs button')]; $('tabs').style.setProperty('--x', ((bs.findIndex(b => b.dataset.tab === t) + .5) / bs.length * 100) + '%'); }
   $('title').textContent = { home: 'Inici', session: 'Sessió', timer: 'Temporitzador', history: 'Historial', plan: 'Pla d\'entrenament', profile: 'Perfil' }[t];
@@ -120,12 +120,12 @@ function go(t) {
 }
 // Banner de paper a la part de dalt de cada pestanya (mateix estil que l'inici): kanji vertical, ull, segell
 function banner() {
-  let k, label, big, sub = '';
+  let k, label, big, sub = '', subHtml = '';
   if (tab === 'session') {
     const a = S.active;
-    k = '登る'; label = a ? (a.type === 'gym' ? 'Gym' : 'Escalada') : 'Avui';
+    k = '登る'; label = a ? (TYPES[a.type] || 'Escalada') : 'Avui';
     if (!a) big = picking ? 'Escalfament' : 'Sessió';
-    else if (a.type === 'gym') { const n = (a.exercises || []).length; big = `${n} ${n === 1 ? 'exercici' : 'exercicis'}`; }
+    else if (a.type !== 'escalada') { const n = (a.exercises || []).length; big = `${n} ${n === 1 ? 'exercici' : 'exercicis'}`; }
     else { const n = a.climbs.length; big = `${n} ${n === 1 ? 'via' : 'vies'}`; }
   } else if (tab === 'history') {
     const n = S.sessions.length; k = '記録'; label = 'Total'; big = `${n} ${n === 1 ? 'sessió' : 'sessions'}`; sub = metrics().best === '—' ? '' : metrics().best;
@@ -134,7 +134,14 @@ function banner() {
     const st = streakStats(), n = DAY_NAMES.reduce((a, _, i) => a + planDay(i).length, 0);
     k = '計画'; label = 'Setmana'; big = `${st.planned}/7 dies`; sub = n ? `${n} exercicis` : '';
   } else if (tab === 'profile') {
-    k = '身体'; label = 'Nivell'; big = S.profile.maxGrade; sub = `${{ bloc: 'Bloc', via: 'Via', mix: 'Mixt' }[S.profile.goal] || ''} · ${S.profile.days} dies`;
+    const pr = S.profile, n = pr.since ? new Date().getFullYear() - +pr.since : 0;
+    k = '身体'; label = gName() ? `${orbHtml(gs().eq, 20, 'live')}<span class="oname">${esc(gName())}</span>` : pr.maxGrade; big = pr.name || 'El teu nom';
+    // Més dibuix que text: icona de l'objectiu, barretes dels dies i el color del nivell
+    subHtml = `<div class="pbadges" aria-label="${esc({ bloc: 'Bloc', via: 'Via', mix: 'Mixt' }[pr.goal] || '')}, ${pr.days} dies per setmana">
+      <div class="pb"><i class="pf-dot" style="--c:${COLORS[(pr.maxGrade || '').split(' ')[0]] || '#888'}"></i><small lang="ja">級</small></div>
+      <div class="pb">${ic(pr.goal)}<small lang="ja">的</small></div>
+      <div class="pb"><span class="pf-days">${[...Array(7)].map((_, i) => `<i class="${i < pr.days ? 'on' : ''}"></i>`).join('')}</span><small lang="ja">週</small></div>
+      ${n > 0 ? `<div class="pb"><b>${n}</b><small lang="ja">年</small></div>` : ''}</div>`;
   } else return '';
   return `<div class="hero banner b-${tab}"><span class="vert" lang="ja">${k}</span>${tab === 'profile' ? `<div class="scene" aria-hidden="true"><svg class="ring" viewBox="0 0 200 200">${RING}</svg><img class="handimg" src="ma.png" alt=""></div>`
       : tab === 'session' && !S.active && picking ? `<div class="scene" aria-hidden="true"><svg class="ring" viewBox="0 0 200 200">${RING}</svg><img class="fist" src="art/puny.png" alt=""></div>`
@@ -142,10 +149,10 @@ function banner() {
       : tab === 'history' ? `<div class="scene" aria-hidden="true"><svg class="ring" viewBox="0 0 200 200">${RING}</svg><img class="cloud" src="nuvol.png" alt=""><img class="column" src="columna.png" alt=""></div>`
       : tab === 'plan' ? `<div class="scene" aria-hidden="true"><svg class="ring" viewBox="0 0 200 200">${RING}</svg><img class="torii" src="torii.png" alt=""></div>`
       : artSvg(tab)}
-    <div class="date">${label}</div><div class="big">${esc(big)}</div>${sub ? `<p class="sub">${esc(sub)}</p>` : ''}<span class="hanko" lang="ja">${BANNER_SEAL[tab]}</span></div>`;
+    <div class="date">${label}</div><div class="big">${esc(big)}</div>${sub ? `<p class="sub">${esc(sub)}</p>` : ''}${subHtml}<span class="hanko" lang="ja">${BANNER_SEAL[tab]}</span></div>`;
 }
 // Il·lustracions de tinta com a fons suau d'algunes targetes (segons el títol)
-const CARD_ART = { 'Estat': 'mussol', 'Punts febles': 'eclipsi','Escalada d\'avui': 'mans-pinca', 'Força de dits': 'mans-pinca', 'Afegir via': 'mans-roca', 'Progressió': 'catedral', 'Recordatoris': 'lluna', 'Lesions': 'espina', 'Son i recuperació': 'mussol' };
+const CARD_ART = { 'Estat': 'mussol', 'El meu perfil': 'eclipsi','Escalada d\'avui': 'mans-pinca', 'Força de dits': 'mans-pinca', 'Afegir via': 'mans-roca', 'Progressió': 'catedral', 'Recordatoris': 'lluna', 'Lesions': 'espina', 'Son i recuperació': 'mussol' };
 function cardArt() {
   document.querySelectorAll('#view .card h2').forEach(h => {
     const k = CARD_ART[h.textContent.trim()], c = h.closest('.card');
@@ -156,6 +163,8 @@ function render() {
   clearInterval(ticker);
   $('view').innerHTML = banner() + { home: viewHome, session: viewSession, timer: viewItv, history: viewHistory, plan: viewPlan, profile: viewProfile }[tab]();
   cardArt();
+  const gt = document.querySelector('.gtabs'); if (gt) gt.scrollLeft = planTabX;
+  profileFx();
   if (tab === 'timer') itvSync(itvRun ? (itvRun.end - Date.now()) / 1000 : 0);
   if (tab === 'session' && S.active) ticker = setInterval(tick, 250);
 }
@@ -183,7 +192,7 @@ function viewHome() {
   return `
   <div class="hero">
     <span class="vert" lang="ja">登る</span>${eyeSvg()}
-    <div class="date">${dt}</div>
+    <div class="date">${S.profile.name ? `${esc(S.profile.name)} · ` : ''}${dt}</div>
     <div class="big">${S.active ? 'Sessió en curs' : items.length ? 'Avui toca' : 'Dia de descans'}</div>
     <p class="sub">${items.length ? `${items.length} ${items.length === 1 ? 'exercici' : 'exercicis'}` : ''}</p>
     <span class="hanko" lang="ja">目</span>
@@ -191,8 +200,11 @@ function viewHome() {
   </div>
   <div class="card day hday ${items.length ? '' : 'rest'}"><img class="lily" src="lliri.png" alt="" aria-hidden="true">
     <h2><span class="wd" lang="ja" style="margin-top:-2px">${'月火水木金土日'[todayIdx]}</span>${DAY_NAMES[todayIdx]}</h2>
-    ${items.length ? `<ul>${items.map(i => `<li>${injRisk(i) ? warnI() : ''}${esc(i)}</li>`).join('')}</ul>`
-      : `<button class="small" onclick="go('plan')">+ Afegir al pla</button>`}
+    ${items.length ? (() => {
+      const li = arr => `<ul>${arr.map(i => `<li>${injRisk(i) ? warnI() : ''}${esc(i)}</li>`).join('')}</ul>`;
+      const main = items.filter(i => !isHomeEx(i)), home = items.filter(isHomeEx);
+      return (main.length ? (home.length ? '<p class="sect">Entreno diari</p>' : '') + li(main) : '') + (home.length ? `<p class="sect home${main.length ? '' : ' solo'}">${ic('home')}Entreno a casa</p>${li(home)}` : '');
+    })() : `<button class="small" onclick="go('plan')">+ Afegir al pla</button>`}
   </div>
   ${injList().map(j => `<div class="card day"><h2>Rehab · ${injName(j)}</h2>
     ${phaseBar(j.phase)}
@@ -209,7 +221,8 @@ function viewHome() {
     <p class="muted"><span class="tag ${cls}">${state}</span>${m.pain >= 5 ? ` <span class="tag bad">Dolor ${m.pain}/10</span>` : ''}</p>
     <div class="wk${weeks.some(w => w > 0) ? '' : ' empty'}">${weeks.map((w, i) => `<i class="${i === 7 ? 'now' : ''}" style="--k:${i};height:${weeks.some(x => x > 0) ? Math.max((w / max) * 100, 7) : 7}%"></i>`).join('')}</div>
     <div class="wkl"><span>8 setmanes</span><span>ara</span></div>
-  </div>`;
+  </div>
+  ${viewGacha()}`;
 }
 
 // ---------- Sessió en directe ----------
@@ -262,7 +275,7 @@ const wzChime = notes => notes.forEach((f, k) => wzTone(f, 420, k * .13));
 function wzPhase(p, sec) { wz.phase = p; wz.dur = sec; wz.end = sec ? Date.now() + sec * 1000 : 0; wz.last = null; }
 function wzLoop() { clearInterval(wzTimer); wzTimer = setInterval(wzTick, 100); }
 // Primer una pantalla d'inici (llista d'exercicis) on s'accepta començar; després tot va sol
-function wzStart() { clearInterval(wzTimer); wz = { i: 0, set: 1, enter: true, phase: 'intro', end: 0 }; }
+function wzStart() { clearInterval(wzTimer); wzAsk = false; wz ={ i: 0, set: 1, enter: true, phase: 'intro', end: 0 }; }
 function wzBegin() { wz.enter = true; wzPhase('ready', WZ_READY); wzLoop(); wzDraw(); }
 function wzStop() { clearInterval(wzTimer); wz = null; }
 function wzAdvance() {
@@ -361,7 +374,7 @@ function wzHtml() {
 function beginSession() {
   wzStop();
   const color = gradeAt(gi(S.profile.maxGrade) - 1).split(' ')[0], level = 'fàcil';
-  S.active = { id: Date.now(), date: today(), start: Date.now(), type: 'escalada', climbs: [], exercises: [], warmup: WARMUP.slice(), pick: { color, level } };
+  S.active = { id: Date.now(), date: today(), start: Date.now(), type: homeOnly(planDay((new Date().getDay() + 6) % 7)) ? 'casa' : 'escalada', climbs: [], exercises: [], warmup: WARMUP.slice(), pick: { color, level } };
   picking = false; save(); go('session');
 }
 // Temporitzador d'intervals: temps de treball, descans, repeticions, sèries i descans entre sèries.
@@ -464,9 +477,17 @@ function viewItv() {
 }
 function viewWarmups() {
   if (!wz) wzStart();
+  // Un toc sense voler no pot tancar l'escalfament: un cop començat, cal confirmar
+  const ask = wzAsk && wz && !['intro', 'done'].includes(wz.phase);
   return `<div class="card wz" id="wz">${wzHtml()}</div>
-  <p class="row"><button class="danger" onclick="wzStop();picking=false;go('home')">Cancel·lar</button></p>`;
+  ${ask ? `<p class="muted" style="text-align:center;margin:10px 0 6px">Sortir de l'escalfament?</p>
+    <p class="row"><button onclick="wzAskCancel(false)">Continuar</button><button class="primary" style="background:var(--bad)" onclick="wzQuit()">Sortir</button></p>`
+    : `<p class="row"><button class="danger" onclick="wzCancel()">Cancel·lar</button></p>`}`;
 }
+let wzAsk = false;
+function wzAskCancel(v) { wzAsk = v; render(); }
+function wzCancel() { if (wz && !['intro', 'done'].includes(wz.phase)) wzAskCancel(true); else wzQuit(); }
+function wzQuit() { wzAsk = false; wzStop(); picking = false; go('home'); }
 function tick() {
   if (!S.active) return;
   const el = $('clock'); if (el) el.textContent = fmt((Date.now() - S.active.start) / 1000);
@@ -479,10 +500,21 @@ function tick() {
 }
 function startRest(sec) { restEnd = Date.now() + sec * 1000; tick(); }
 
+// Pestanya Sessió sense sessió en curs: què toca avui i com va la darrera
+function viewSessionIdle() {
+  const items = planDay((new Date().getDay() + 6) % 7), last = S.sessions[0];
+  const sd = d => d.split('-').reverse().join('/');
+  const today_ = `<div class="card"><h2>Avui al pla</h2>${items.length
+    ? `<ul class="list todaylist">${items.map(n => `<li>${exLabel(n)}</li>`).join('')}</ul>`
+    : `<p class="muted" style="margin:0 0 12px">Dia de descans</p><button class="small" onclick="go('plan')">+ Afegir al pla</button>`}</div>`;
+  const lastC = last ? `<div class="card"><h2>Última sessió</h2>
+    <div class="stats"><div class="stat"><b>${esc(sd(last.date))}</b><span>data</span></div><div class="stat"><b>${last.duration || '—'}<small>${last.duration ? ' min' : ''}</small></b><span>durada</span></div><div class="stat"><b>${(last.climbs || []).length}</b><span>vies</span></div></div></div>` : '';
+  return today_ + lastC;
+}
 function viewSession() {
   const a = S.active;
   if (!a && picking) return viewWarmups();
-  if (!a) return `<div class="card"><button class="primary" style="width:100%" onclick="startSession()">${ic('play')}Començar sessió</button></div>`;
+  if (!a) return `<div class="card"><button class="primary" style="width:100%" onclick="startSession()">${ic('play')}Començar sessió</button></div>${viewSessionIdle()}`;
   const pick = a.pick || (a.pick = { color: 'Verd', level: 'fàcil' });
   return `
   <div class="card">
@@ -550,6 +582,11 @@ const IC = {
   noflash: `<path d="${BOLT}" opacity=".55"/><path d="M4 4L20 20"/>`,
   star: '<path d="M12 3L14.8 8.8L21 9.7L16.5 14.1L17.6 20.3L12 17.3L6.4 20.3L7.5 14.1L3 9.7L9.2 8.8Z"/>',
   // Icones d'interfície (en lloc de símbols de text)
+  left: '<path d="M15 5L8 12L15 19"/>',
+  right: '<path d="M9 5L16 12L9 19"/>',
+  via: '<path d="M9 3c7 3-7 6 0 9s7 5 0 9"/><circle cx="17" cy="5" r="1.4" fill="currentColor"/>',
+  mix: '<circle cx="9" cy="12" r="5.5"/><circle cx="15" cy="12" r="5.5"/>',
+  home: '<path d="M5 11v9h14v-9"/><path d="M3 12L12 4l9 8"/><path d="M10 20v-5h4v5"/>',
   play: '<path d="M8 5.5V18.5L18.5 12Z" fill="currentColor"/>',
   stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor"/>',
   x: '<path d="M6 6L18 18M18 6L6 18"/>',
@@ -601,7 +638,7 @@ function gymRoutine() {
 function climbToday() { return planDay((new Date().getDay() + 6) % 7).filter(isClimbEx); }
 function viewGym(a) {
   const r = gymRoutine();
-  if (!r) return `<div class="card"><h2>Gym</h2><button class="small" onclick="go('plan')">+ Afegir al pla</button></div>`;
+  if (!r) return `<div class="card"><h2>${TYPES[a.type] || 'Gym'}</h2><button class="small" onclick="go('plan')">+ Afegir al pla</button></div>`;
   const done = a.gymDone || {}, load = a.gymLoad || {};
   return `<div class="card">
     <h2>${DAY_NAMES[r.day]}</h2>
@@ -732,7 +769,7 @@ function viewCalendar() {
       <div class="stat"><b>${st.planned ? `${st.thisWeek}/${st.planned}` : '—'}</b><span>setmana</span></div>
       <div class="stat"><b>${st.adherence === null ? '—' : st.adherence + ' %'}</b><span>compliment</span></div>
     </div>
-    <div class="cal-head"><button class="small" aria-label="Mes anterior" onclick="calMove(-1)">‹</button><b>${MONTHS[m]} ${y}</b><button class="small" aria-label="Mes següent" onclick="calMove(1)">›</button></div>
+    <div class="cal-head"><button class="small" aria-label="Mes anterior" onclick="calMove(-1)">${ic('left')}</button><b>${MONTHS[m]} ${y}</b><button class="small" aria-label="Mes següent" onclick="calMove(1)">${ic('right')}</button></div>
     <div class="cal">${['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'].map(n => `<small>${n}</small>`).join('')}${cells.join('')}</div>
     <p class="muted cal-key"><span class="k done"></span> entrenat <span class="k plan"></span> planificat</p>
   </div>`;
@@ -821,6 +858,9 @@ function buildPlan() {
 // Un apartat per cada grup muscular (de més a menys prioritat) + Escalada i Recuperació. Els exercicis són xips.
 const PLAN_CATALOG = {
   'Escalada': ['Kilter board', 'Autos', 'Bloc límit', 'Resistència', 'Lliure', 'Volum fàcil', 'Tècnica de peus', '4×4'],
+  // Per als dies que no vas al roco: tot el que es pot fer a casa amb poc material (barra, hangboard, cadira)
+  'A casa': ['Hangboard a casa', 'Dominades a la barra de casa', 'Flexions a casa', 'Fons a la cadira', 'Esquats a casa', 'Circuit de core a casa',
+    'Mobilitat a casa', 'Estiraments a casa'],
   'Dits i antebraços': ['Suspensions màximes al llistó', 'Dits 5×10', 'Campus', 'Wrist roller', 'Pinça amb disc', 'Curl de canell invers', 'Curl de canell',
     'Repeaters 7/3', 'Penjades a regleta 20 mm', 'Penjades a mà oberta', 'Massilla per als dits'],
   'Esquena': ['Dominades', 'Sèries de dominades', 'Dominades excèntriques', 'Dominades amb llast', 'Remada amb manuelles', 'Remada invertida', 'Lock-off a 90°'],
@@ -835,6 +875,38 @@ const PLAN_CATALOG = {
 // Imatges dels exercicis (silueta): nom del pla -> fitxer a exercicis/
 const EXIMG = {
   'Kilter board': 'kilter-board.png',
+  'Toes to bar': 'toes-to-bar.png',
+  'Esquats': 'esquats.png',
+  'Correr': 'correr.png',
+  'Zancades': 'zancades.png',
+  'Pont de glutis': 'pont-glutis.png',
+  'Elevacions de bessons': 'elevacions-bessons.png',
+  'Mobilitat de malucs': 'mobilitat-malucs.png',
+  'Passos alts a l\'esglaó': 'passos-alts.png',
+  'Rotació externa amb goma': 'rotacio-externa.png',
+  'Rotació interna amb goma': 'rotacio-interna.png',
+  'Flexions escapulars': 'flexions-escapulars.png',
+  'Mobilitat d\'espatlles i dits': 'mobilitat-espatlles.png',
+  'Y-T-W amb manuelles': 'y-t-w.png',
+  'Push-up plus': 'push-up-plus.png',
+  'Flexions o fons': 'flexions.png',
+  'Extensions de canell amb manuelles': 'extensions-canell.png',
+  'Pronació i supinació amb martell': 'pronacio-supinacio.png',
+  'Obrir els dits contra una goma': 'obrir-dits-goma.png',
+  'Press d\'espatlles amb manuelles': 'press-espatlles.png',
+  'Flexions en pica': 'flexions-pica.png',
+  'Estiraments 10 min': 'estiraments-10.png',
+  'Estiraments d\'avantbraços': 'estiraments-avantbracos.png',
+  'Mobilitat de canells': 'mobilitat-canells.png',
+  'Passejar 30 min': 'passejar.png',
+  'Flexions a casa': 'flexions.png',
+  'Esquats a casa': 'esquats.png',
+  'Mobilitat a casa': 'mobilitat-malucs.png',
+  'Estiraments a casa': 'estiraments-10.png',
+  'Hangboard a casa': 'penjades-regleta-20.png',
+  'Dominades a la barra de casa': 'dominades.png',
+  'Fons a la cadira': 'fons-triceps.png',
+  'Circuit de core a casa': 'hollow-body.png',
   'Autos': 'autos.png',
   'Bloc límit': 'bloc-limit.png',
   'Resistència': 'resistencia.png',
@@ -877,7 +949,14 @@ const EXIMG = {
 };
 let planAdd = -1, planClearAsk = false;
 const planDay = i => ((S.plan = S.plan || {})[i] = S.plan[i] || []);
-function togglePlanAdd(i) { planAdd = planAdd === i ? -1 : i; render(); }
+// Selector d'exercicis: un sol grup a la vegada (pestanyes amb comptador) i els triats surten marcats
+let planGroup = 'Escalada', planTabX = 0;
+function openPlanAdd(i, g = 'Escalada') { planAdd = i; planGroup = g; planTabX = 0; render(); }
+function closePlanAdd() { planAdd = -1; render(); }
+function setPlanGroup(g) { planGroup = g; render(); }
+const HOME_EX = () => PLAN_CATALOG['A casa'];
+const isHomeEx = name => HOME_EX().includes(name);
+const homeOnly = list => list.length > 0 && list.every(isHomeEx);
 function addPlanItem(i, name) {
   name = (name || '').trim(); if (!name) return;
   const l = planDay(i), k = l.indexOf(name);
@@ -921,7 +1000,7 @@ const REHAB = [
 ];
 const REHAB_PREVENT = ['Escalfa sempre: dits, espatlles, colze', 'Càrrega: màxim +10% per setmana', '48 h entre sessions fortes de dits', 'Evita el full crimp amb dits freds o cansats', 'Primer dolor: para', 'Antagonistes 2-3×/setmana', 'Dorm bé'];
 const phaseBar = n => `<div class="phases">${REHAB.map((_, k) => `<i class="${k < n ? 'on' : ''}"></i>`).join('')}</div>`;
-const HARD_FINGER = ['Kilter board', 'Bloc límit', 'Campus', 'Suspensions màximes al llistó', 'Dits 5×10', 'Repeaters 7/3', 'Penjades a regleta 20 mm', '4×4'];
+const HARD_FINGER = ['Hangboard a casa', 'Kilter board','Bloc límit', 'Campus', 'Suspensions màximes al llistó', 'Dits 5×10', 'Repeaters 7/3', 'Penjades a regleta 20 mm', '4×4'];
 // Avantbraç sense càrrega de politja: no se senyala amb ⚠ encara que sigui del grup de dits
 const FOREARM_OK = ['Wrist roller', 'Curl de canell invers', 'Curl de canell', 'Massilla per als dits'];
 const injList = () => (S.injuries = S.injuries || []);
@@ -929,7 +1008,7 @@ const injById = id => injList().find(j => j.id === id);
 const injName = j => `${j.zone} · ${j.finger.toLowerCase()} ${j.hand}`;
 // Exercicis del pla que poden carregar el dit lesionat (es marquen amb ⚠)
 function injRisk(name) {
-  return injList().some(j => j.phase <= 2 ? PLAN_CATALOG['Escalada'].concat(PLAN_CATALOG['Dits i antebraços'], PLAN_CATALOG['Esquena']).includes(name) && !FOREARM_OK.includes(name)
+  return injList().some(j => j.phase <= 2 ? PLAN_CATALOG['Escalada'].concat(PLAN_CATALOG['Dits i antebraços'], PLAN_CATALOG['Esquena'], ['Hangboard a casa', 'Dominades a la barra de casa']).includes(name) && !FOREARM_OK.includes(name)
     : j.phase === 3 ? HARD_FINGER.includes(name) : false);
 }
 const exIcon = n => EXIMG[n] ? `<img class="exi" src="exercicis/${EXIMG[n]}" alt="" loading="lazy">` : '';
@@ -1035,42 +1114,103 @@ function viewWeak() {
 function viewPlan() {
   const todayIdx = (new Date().getDay() + 6) % 7;
   const empty = !DAY_NAMES.some((_, i) => planDay(i).length);
-  const picker = i => `<div class="picker">
-    ${Object.entries(PLAN_CATALOG).map(([g, list]) => `<p class="muted" style="margin:10px 0 4px">${g}</p>
-      <div class="chips">${list.length ? list.map((x, k) => `<button class="chip ${planDay(i).includes(x) ? 'on' : ''}" onclick="addCatalog(${i},'${g}',${k})">${exIcon(x)}${esc(x)}</button>`).join('') : '<span class="muted">—</span>'}</div>`).join('')}
-    <p class="muted" style="margin:10px 0 4px">Altre</p>
-    <div class="row"><input id="plancustom" placeholder="Escriu…" maxlength="60" onkeydown="if(event.key==='Enter')addCustom(${i})"><button class="small" style="flex:none" onclick="addCustom(${i})">Afegir</button></div>
-    <button class="primary" style="width:100%;margin-top:10px" onclick="togglePlanAdd(${i})">Fet</button></div>`;
+  const picker = i => {
+    const sel = planDay(i), all = Object.values(PLAN_CATALOG).flat(), custom = sel.filter(x => !all.includes(x));
+    const tabs = [...Object.keys(PLAN_CATALOG), 'Altre'], g = tabs.includes(planGroup) ? planGroup : tabs[0];
+    const cnt = t => t === 'Altre' ? custom.length : sel.filter(x => PLAN_CATALOG[t].includes(x)).length;
+    const body = g === 'Altre'
+      ? `${custom.length ? `<div class="chips">${custom.map(x => `<button class="chip on" data-n="${esc(x)}" onclick="addPlanItem(${i},this.dataset.n)">${esc(x)}</button>`).join('')}</div>` : ''}
+        <div class="row" style="margin-top:10px"><input id="plancustom" placeholder="Escriu un exercici…" maxlength="60" onkeydown="if(event.key==='Enter')addCustom(${i})"><button class="small" style="flex:none" onclick="addCustom(${i})">Afegir</button></div>`
+      : `<div class="chips">${PLAN_CATALOG[g].map((x, k) => `<button class="chip ${sel.includes(x) ? 'on' : ''}" onclick="addCatalog(${i},'${g}',${k})">${exIcon(x)}${esc(x)}</button>`).join('')}</div>`;
+    return `<div class="picker">
+      <div class="gtabs" onscroll="planTabX=this.scrollLeft">${tabs.map(t => `<button class="gtab ${t === g ? 'on' : ''}" onclick="setPlanGroup('${t}')">${t === 'A casa' ? ic('home') : ''}${t}${cnt(t) ? `<i>${cnt(t)}</i>` : ''}</button>`).join('')}</div>
+      ${body}
+      <button class="primary" style="width:100%;margin-top:14px" onclick="closePlanAdd()">${sel.length ? `Fet · ${sel.length} ${sel.length === 1 ? 'exercici' : 'exercicis'}` : 'Fet'}</button></div>`;
+  };
   return `
   ${viewRehab()}
   ${DAY_NAMES.map((name, i) => {
     const list = planDay(i);
     return `<div class="card day ${list.length ? '' : 'rest'}" ${i === todayIdx ? 'style="border-color:var(--warn)"' : ''}>
-    <span class="wd" lang="ja">${'月火水木金土日'[i]}</span><b>${name}</b>${list.length ? '' : ' · <span class="muted">Descans</span>'}
-    ${list.length || (planOff[i] || []).length ? `<div class="chips planchips">${[...list, ...(planOff[i] || [])].map((x, k) => `<button class="chip ${k < list.length ? 'on' : ''}" onclick="togglePlanChip(${i},${k})">${exLabel(x)}</button>`).join('')}</div>` : ''}
-    ${planAdd === i ? picker(i) : `<button class="small" style="margin-top:8px" onclick="togglePlanAdd(${i})">+ Afegir</button>`}
+    <span class="wd" lang="ja">${'月火水木金土日'[i]}</span><b>${name}</b>${list.length ? '' : '<span class="muted dsc">Descans</span>'}
+    ${planAdd === i ? picker(i) : (() => {
+      // L'entreno diari i el de casa surten separats; els índexs es mantenen per poder marcar/desmarcar
+      const all = [...list, ...(planOff[i] || [])].map((x, k) => ({ x, k }));
+      const chips = arr => `<div class="chips planchips">${arr.map(({ x, k }) => `<button class="chip ${k < list.length ? 'on' : ''}" onclick="togglePlanChip(${i},${k})">${exLabel(x)}</button>`).join('')}</div>`;
+      const main = all.filter(o => !isHomeEx(o.x)), home = all.filter(o => isHomeEx(o.x));
+      return (main.length ? `<p class="sect">Entreno diari</p>${chips(main)}` : '') + (home.length ? `<p class="sect home${main.length ? '' : ' solo'}">${ic('home')}Entreno a casa</p>${chips(home)}` : '');
+    })()}
+    ${planAdd === i ? '' : `<div class="row addrow"><button class="small" onclick="openPlanAdd(${i})">+ Afegir</button><button class="small" onclick="openPlanAdd(${i},'A casa')">${ic('home')}A casa</button></div>`}
   </div>`; }).join('')}
   ${empty ? '' : planClearAsk
     ? `<div class="card"><p>Esborrar tot el pla?</p><div class="row"><button onclick="askClearPlan(false)">Cancel·lar</button><button class="primary" style="background:var(--bad)" onclick="clearPlan()">Esborrar tot</button></div></div>`
     : `<p><button class="danger" onclick="askClearPlan(true)">Esborrar tot el pla</button></p>`}
   ${viewWeak()}`;
 }// ---------- Perfil ----------
+// Apartats amagats de moment (el codi segueix): lesions, Garmin, força de dits, pes, son i recuperació, recordatoris.
+// Per tornar-los, posa PROFILE_EXTRA = true.
+const PROFILE_EXTRA = false;
+// El perfil s'edita sobre un esborrany (pd) i es desa amb "Desar"; en sortir de la pestanya es descarta
+let pd = null;
+const pdraft = () => pd || (pd = Object.assign({ name: '', gym: '', since: '' }, S.profile));
+function pdSet(k, v) { pdraft()[k] = v; render(); }
+function pdGrade(color, level) { const [c, l] = pdraft().maxGrade.split(' '); pdSet('maxGrade', `${color || c} ${level || l}`); }
+// Roda d'ajustos (estil tinta: engranatge de 8 dents) per entrar a editar el perfil
+const COG = '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><path fill-rule="evenodd" d="M12 4.6a7.4 7.4 0 1 1 0 14.8 7.4 7.4 0 0 1 0-14.8zM12 9.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z"/>'
+  + [0, 45, 90, 135, 180, 225, 270, 315].map(a => `<rect x="10.4" y="1.8" width="3.2" height="5" rx="1.6" transform="rotate(${a} 12 12)"/>`).join('') + '</g></svg>';
+let profEdit = false;
+function profEditOpen() { pd = null; profEdit = true; render(); window.scrollTo(0, 0); }
+function profEditClose() { pd = null; profEdit = false; render(); }
 function viewProfile() {
-  const p = S.profile;
+  if (!profEdit) return viewProfileSummary();
+  const p = pdraft(), [col, lvl] = p.maxGrade.split(' '), yr = new Date().getFullYear();
+  const goals = { bloc: 'Bloc', via: 'Via', mix: 'Mixt' };
   return `
-  <div class="card">
-    <label>Grau màxim</label><select id="pg">${opts(GRADES, p.maxGrade)}</select>
-    <label>Objectiu</label><select id="po">${optsObj({ bloc: 'Bloc', via: 'Via', mix: 'Mixt' }, p.goal)}</select>
-    <label>Dies per setmana</label><select id="pdays">${opts(['2', '3', '4', '5', '6'], String(p.days))}</select>
-    <label>Inici del cicle</label><input id="pstart" type="date" value="${p.start}">
-    <p><button class="primary" style="width:100%" onclick="saveProfile()">Desar</button></p>
+  <div class="card namecard">
+    <h2>El teu nom</h2>
+    <input class="namein" value="${esc(p.name)}" maxlength="24" placeholder="Com et dius?" autocomplete="off" oninput="pdraft().name=this.value">
   </div>
-  ${viewInjuries()}
-  ${viewGarmin()}
-  ${viewFingers()}
-  ${viewWeight()}
-  ${viewRecovery()}
-  ${viewRemind()}
+  <div class="card">
+    <h2>Sobre tu</h2>
+    <label style="margin-top:0">El meu roco</label><input value="${esc(p.gym)}" maxlength="40" placeholder="On escales normalment" autocomplete="off" oninput="pdraft().gym=this.value">
+    <label>Escalo des de</label><input type="number" inputmode="numeric" min="1980" max="${yr}" placeholder="Any" value="${esc(p.since)}" oninput="pdraft().since=this.value">
+  </div>
+  <div class="card">
+    <h2>El meu nivell</h2>
+    <div class="colors">${Object.entries(COLORS).map(([c, hex]) => `<button class="swatch ${col === c ? 'on' : ''}" style="--c:${hex}" aria-label="${c}" title="${c}" onclick="pdGrade('${c}')"></button>`).join('')}</div>
+    <div class="lvl">${LEVELS.map(l => `<button class="${lvl === l ? 'on' : ''}" onclick="pdGrade('','${l}')">${l[0].toUpperCase() + l.slice(1)}</button>`).join('')}</div>
+    <div class="gradebadge" style="--c:${COLORS[col]}"><i></i><b>${p.maxGrade}</b></div>
+  </div>
+  <div class="card">
+    <h2>El meu objectiu</h2>
+    <div class="tiles three">${Object.entries(goals).map(([k, n]) => `<button class="${p.goal === k ? 'on' : ''}" onclick="pdSet('goal','${k}')">${ic(k)}<span>${n}</span></button>`).join('')}</div>
+    <label>Dies per setmana</label>
+    <div class="seg days">${[2, 3, 4, 5, 6].map(n => `<button class="${+p.days === n ? 'on' : ''}" onclick="pdSet('days',${n})">${n}</button>`).join('')}</div>
+    <label>Inici del cicle</label><input id="pstart" type="date" value="${p.start}" onchange="pdraft().start=this.value">
+  </div>
+  <div class="row" style="margin-bottom:12px"><button onclick="profEditClose()">Cancel·lar</button><button class="primary" onclick="saveProfile()">Desar</button></div>`;
+}
+// Vista del perfil: tot junt, de lectura; la roda d'ajustos del banner porta a l'edició
+function viewProfileSummary() {
+  const p = S.profile, [col] = (p.maxGrade || 'Lila fàcil').split(' '), yr = new Date().getFullYear(), n = p.since ? yr - +p.since : 0;
+  const row = (k, v) => `<div class="pf-row"><span>${k}</span><b>${v}</b></div>`;
+  const goal = { bloc: 'Bloc', via: 'Via', mix: 'Mixt' }[p.goal] || '';
+  const dots = `<span class="pf-days" aria-label="${p.days} dies">${[...Array(7)].map((_, i) => `<i class="${i < p.days ? 'on' : ''}"></i>`).join('')}</span>`;
+  const sd = p.start ? p.start.split('-').reverse().join('/') : '—';
+  return `
+  <div class="card pf">
+    <div class="cardhead"><h2>El meu perfil</h2><button class="cog" aria-label="Ajustos del perfil" title="Ajustos" onclick="profEditOpen()">${COG}</button></div>
+    ${p.name ? '' :`<p class="muted pf-hint">Toca la roda d'ajustos ${COG.replace('<svg', '<svg class="inl"')} per posar-hi el teu nom.</p>`}
+    ${row('Nom', p.name ? esc(p.name) : '<em>—</em>')}
+    <div class="pf-row"><span>Esfera</span><b>${gName() ? `${orbHtml(gs().eq, 28, 'live')}${esc(gName())}` : '<em>—</em>'}<button class="small" aria-label="Triar esfera" onclick="gachaColl()">${ic('right')}</button></b></div>
+    ${row('Nivell', `<i class="pf-dot" style="--c:${COLORS[col] || '#888'}"></i>${esc(p.maxGrade)}`)}
+    ${row('Objectiu', `${ic(p.goal)}${goal}`)}
+    ${row('Dies per setmana', `${dots}${p.days}`)}
+    ${row('Escalo des de', p.since ? `${esc(p.since)}${n > 0 ? ` <small>(${n} ${n === 1 ? 'any' : 'anys'})</small>` : ''}` : '<em>—</em>')}
+    ${row('El meu roco', p.gym ? esc(p.gym) : '<em>—</em>')}
+    ${row('Inici del cicle', sd)}
+  </div>
+  ${PROFILE_EXTRA ? viewInjuries() + viewGarmin() + viewFingers() + viewWeight() + viewRecovery() + viewRemind() : ''}
   ${viewInstall()}
   <div class="card">
     <h2>Dades</h2>
@@ -1079,6 +1219,301 @@ function viewProfile() {
       <button onclick="$('imp').click()">Importar</button></div>
     <input id="imp" type="file" accept=".json" style="display:none" onchange="importData(this.files[0])">
   </div>`;
+}
+// ---------- Gacha d'esferes ----------
+// 100 esferes, cada una diferent. La probabilitat baixa de forma geomètrica i es calcula perquè l'última sigui exactament
+// 1 entre 10.000.000. Com més rara, més espectacular: brillantor, aures, anells, raigs, estels, nuclis i ones.
+// Tirades: 10 per sessió desada + 1 gratuïta al dia.
+const GORBS = ["Fang", "Cendra", "Argila",
+  "Menta", "Oliva", "Safrà", "Terrissa", "Marfil", "Cirera", "Lavanda", "Atzur", "Corall", "Mel", "Sorra", "Prada", "Heura", "Boira", "Salvia", "Tardor",
+  "Jade", "Ònix", "Ambre", "Turquesa", "Granat", "Topazi", "Peridot", "Obsidiana", "Quars", "Lapislàtzuli", "Citrí", "Maragda", "Safir", "Rubí", "Ametista", "Perla",
+  "Aurora", "Eclipsi", "Tempesta", "Brasa", "Gel", "Magma", "Aigua Viva", "Fulgor", "Llamp", "Nebulosa", "Tramuntana", "Mistral", "Aiguamarina", "Crepuscle", "Nit de Lluna", "Foc Follet", "Glaç Etern", "Orquídia", "Ventijol", "Boira de Mar", "Sirena", "Cometa", "Pluja d'Estels", "Reflex d'Or",
+  "Fènix", "Drac", "Kraken", "Unicorn", "Hidra", "Grifó", "Leviatan", "Behemot", "Pegàs", "Quimera", "Basilisc", "Salamandra", "Cèrber", "Roc", "Minotaure", "Colós",
+  "Ragnarok", "Valhalla", "Olimp", "Avalon", "Atlàntida", "Shangri-La", "Eldorado", "Yggdrasil",
+  "Gràcia", "Nirvana", "Arcàngel", "Epifania", "Oracle", "Revelació", "Sagrament", "Albada Divina",
+  "Supernova", "Púlsar", "Quàsar", "Via Làctia", "Horitzó d'Esdeveniments",
+  "Big Bang", "Caos", "Origen",
+  "L'Esfera del Tot"];
+const G_LAST = 1e-7;   // probabilitat de l'esfera més rara: 1 entre 10.000.000
+// Probabilitat de cada esfera: p_i ∝ r^i, amb r triat (per bisecció) perquè p_última = G_LAST
+const GP = (() => {
+  const n = GORBS.length, last = r => (r ** (n - 1)) * (1 - r) / (1 - r ** n);
+  let lo = .5, hi = .99999;
+  for (let k = 0; k < 200; k++) { const m = (lo + hi) / 2; if (last(m) > G_LAST) hi = m; else lo = m; }
+  const r = (lo + hi) / 2, w = GORBS.map((_, i) => r ** i), s = w.reduce((a, b) => a + b, 0);
+  return w.map(x => x / s);
+})();
+const gOdds = i => Math.round(1 / GP[i]);
+const gFmt = n => n.toLocaleString('ca-ES');
+// Categories de raresa (nom, "1 entre N" màxim, color). L'última és només per a l'esfera 1/10.000.000.
+const G_TIERS = [['comú', 10, '#9b9488'], ['poc comú', 100, '#4caf7d'], ['rar', 1000, '#4f8fd6'], ['èpic', 30000, '#a46ad6'], ['llegendari', 300000, '#f2c14e'],
+  ['mític', 1000000, '#f0684c'], ['diví', 3000000, '#ff7eb6'], ['còsmic', 6000000, '#4fe0e6'], ['primordial', 9500000, '#e8e6ff'], ['únic', Infinity, '#ffffff']];
+const gTier = i => G_TIERS.find(t => gOdds(i) <= t[1]);
+const gTi = i => G_TIERS.indexOf(gTier(i));
+// Sempre el mateix objecte (si no, els canvis fets sobre una còpia es perdrien)
+const gs = () => {
+  const g = S.gacha || (S.gacha = {});
+  if (typeof g.spent !== 'number') g.spent = 0;
+  if (typeof g.fday !== 'string') g.fday = '';   // dia de les tirades gratuïtes gastades
+  if (typeof g.fused !== 'number') g.fused = 0;  // gratuïtes gastades aquell dia
+  if (typeof g.dday !== 'string') g.dday = '';   // dia del recompte de tirades (per a la sort)
+  if (typeof g.dpulls !== 'number') g.dpulls = 0;
+  if (typeof g.pity !== 'number') g.pity = 0;     // barra de sort (0..G_PITY_MAX)
+  if (!g.own || typeof g.own !== 'object') g.own = {};
+  if (typeof g.eq !== 'number') g.eq = -1;
+  if (typeof g.pulls !== 'number') g.pulls = 0;
+  return g;
+};
+const G_PER_SESSION = 10;   // tirades que dóna cada sessió desada
+const gDev = () => !!window.DEV_UNLIMITED;   // només el posa dev.js (localhost): tirades il·limitades per provar
+// Tirades guanyades: només compten les sessions d'1 h o més. Cada sessió en dona G_PER_SESSION, i cada via
+// marró val 2 tirades, cada vermella 10 i cada blanca 100 (sigui fàcil o difícil).
+const G_MIN_MIN = 60, G_CLIMB = { 'Marró': 2, Vermell: 10, Blanc: 100 };
+const gEarned = () => S.sessions.reduce((a, s) => (s.duration || 0) >= G_MIN_MIN
+  ? a + G_PER_SESSION + (s.climbs || []).reduce((b, c) => b + (G_CLIMB[String(c.grade || '').split(' ')[0]] || 0), 0) : a, 0);
+const G_START = 100;   // tirades amb què comença tothom
+const gTokens = () => Math.max(0, gEarned() + G_START - gs().spent);
+// Barra de sort: s'omple amb cada tirada sense cap esfera especial (èpic o més rara) i com més plena, més probabilitat d'especial.
+// Quant s'omple depèn del que surt: com més comuna l'esfera, més puja; en sortir un especial es buida del tot.
+const G_SPECIAL = 3, G_PITY_MAX = 100, G_ADD = [1.6, 1.1, .6];
+const gPityF = () => Math.min(1, gs().pity / G_PITY_MAX);
+const G_SPEC_IDS = GORBS.map((_, i) => i).filter(i => gTi(i) >= G_SPECIAL), G_SPEC_TOT = G_SPEC_IDS.reduce((a, i) => a + GP[i], 0);
+function gRollSpecial() { let u = gRand() * G_SPEC_TOT, c = 0; for (const i of G_SPEC_IDS) { c += GP[i]; if (u < c) return i; } return G_SPEC_IDS[0]; }
+const G_DAILY = 10;   // tirades gratuïtes cada dia, que també són les "primeres tirades del dia" amb sort extra
+const G_LUCK = .01;   // 1 % de sort: cada una té un 1 % de repetir la tirada i quedar-se la més rara
+const gFree = () => { const g = gs(); return g.fday === today() ? Math.max(0, G_DAILY - g.fused) : G_DAILY; };
+const gDayPulls = () => { const g = gs(); return g.dday === today() ? g.dpulls : 0; };
+const gAvail = () => gTokens() + gFree();
+const gCan = () => gDev() || gAvail() > 0;
+const gOwned = () => Object.keys(gs().own).length;
+function gRand() { const a = new Uint32Array(2); crypto.getRandomValues(a); return (a[0] * 2097152 + (a[1] >>> 11)) / 9007199254740992; }   // 53 bits
+function gRoll(u = gRand()) { let c = 0; for (let i = 0; i < GP.length; i++) { c += GP[i]; if (u < c) return i; } return 0; }
+const gName = () => { const e = gs().eq; return e >= 0 ? GORBS[e] : ''; };
+// Tirades: ×1 o ×10. El resultat es desa de seguida però no es mostra fins al final de la cinemàtica.
+const gCan10 = () => gDev() || gAvail() >= 10;
+function gachaPull(forceI) { gachaMulti(1, forceI); }
+function gachaPull10() { gachaMulti(10); }
+function gachaMulti(n, forceI) {
+  const g = gs(), dev = gDev();
+  if (!dev && gAvail() < n) { toast(n > 1 ? `Et falten tirades (${gAvail()}/${n})` : 'Sense tirades: acaba una sessió'); return; }
+  const res = [];
+  for (let k = 0; k < n; k++) {
+    if (!dev) { if (gFree() > 0) { if (g.fday !== today()) { g.fday = today(); g.fused = 0; } g.fused++; } else g.spent++; }
+    // Sort: a les primeres G_DAILY tirades del dia, un 1 % de les vegades es tira dues cops i es queda la més rara
+    if (g.dday !== today()) { g.dday = today(); g.dpulls = 0; }
+    const forced = k === 0 && forceI != null;
+    // Barra de sort: la probabilitat que la tirada sigui especial puja amb la barra (arriba a 100 % quan és plena)
+    let i = forced ? forceI : (gRand() < gPityF() ** 2.5 ? gRollSpecial() : gRoll());
+    if (!forced && g.dpulls < G_DAILY && gRand() < G_LUCK) { const j = gRoll(); if (j > i) i = j; }
+    g.dpulls++;
+    { const ti = gTi(i); g.pity = ti >= G_SPECIAL ? 0 : Math.min(G_PITY_MAX, g.pity + G_ADD[ti]); }
+    res.push({ i, isNew: !g.own[i] }); g.own[i] = (g.own[i] || 0) + 1; g.pulls++;
+  }
+  save(); gWishStart(res);
+  if (tab === 'home') render();
+}
+// Fons del perfil: si l'esfera posada és d'1 entre 1.000.000 o més rara, el fons de la pestanya Perfil agafa vida
+function profileFx() {
+  let f = document.getElementById('pfx');
+  const e = gs().eq, on = tab === 'profile' && e >= 0 && gOdds(e) >= 1000000;
+  if (!on) { if (f) f.remove(); document.body.classList.remove('pfx-on'); return; }
+  if (f && f.dataset.k === String(e)) return;
+  if (f) f.remove();
+  const ti = gTi(e), h1 = (e * 47 + ti * 23) % 360, h2 = (h1 + 35 + (e % 5) * 28) % 360;
+  f = document.createElement('div'); f.id = 'pfx'; f.dataset.k = e; f.className = 'pfx t' + ti; f.setAttribute('aria-hidden', 'true'); f.style.cssText = `--h1:${h1};--h2:${h2}`;
+  f.innerHTML = '<i class="pf-glow"></i><i class="pf-rays"></i>' + (ti >= 7 ? '<i class="pf-neb"></i><i class="pf-stars"></i>' : '') + (ti >= 8 ? '<i class="pf-wave"></i><i class="pf-wave w2"></i>' : '');
+  document.body.appendChild(f); document.body.classList.add('pfx-on');
+}
+const ORB_GLYPHS ='火水木金土風雷氷光闇星月日龍鳳花雪夢心力命';   // símbol gravat dins de les esferes (a partir de "rar")
+// Una esfera: color propi (tonalitat segons el número) i capes d'efectes que s'acumulen amb la raresa.
+// mode 'live' = animada; 'still' = fixa (llistes). 'locked' = silueta d'una esfera que encara no tens.
+function orbHtml(i, size = 64, mode = 'still') {
+  if (mode === 'locked') return `<span class="orb locked" style="--s:${size}px" aria-hidden="true"><i class="sph"></i></span>`;
+  const t = gTi(i), h1 = (i * 47 + t * 23) % 360, h2 = (h1 + 35 + (i % 5) * 28) % 360, pat = i % 4;
+  const sat = [30, 52, 68, 78, 86, 92, 94, 96, 100, 100][t];
+  const rings = (t >= 4) + (t >= 5) + (t >= 7), live = mode === 'live', big = live && size >= 100;
+  const glyph = ORB_GLYPHS[(i * 7 + t * 3) % ORB_GLYPHS.length], kind = ['ember', 'snow', 'bubble', 'spark'][i % 4];
+  const moons = (t >= 4) + (t >= 6) + (t >= 8);
+  let x = '';
+  if (big) x += '<i class="flr"></i>';
+  if (t >= 3) x += '<i class="aura"></i>';
+  if (t >= 6) x += '<i class="rays"></i>';
+  x += `<i class="sph p${pat}">${t >= 2 ? `<i class="gly">${glyph}</i>` : ''}${t >= 7 ? '<i class="stars"></i>' : ''}${t >= 8 ? '<i class="core"></i>' : ''}</i>`;
+  for (let k = 0; k < rings; k++) x += `<i class="ring r${k}"></i>`;
+  if (live) for (let k = 0; k < moons; k++) x += `<i class="moon m${k}"></i>`;
+  if (live && t >= 3) x += `<i class="pt ${kind}"></i>`;
+  if (t >= 5) x += '<i class="spk"></i>';
+  if (live && t >= 5) x += '<i class="flare"></i>';
+  if (t >= 8) x += '<i class="wave"></i>';
+  return `<span class="orb t${t} ${mode}${t === 9 ? ' rb' : ''}" style="--s:${size}px;--h1:${h1};--h2:${h2};--sat:${sat}%" aria-hidden="true">${x}</span>`;
+}
+// Barra de sort (sense text): s'omple amb les tirades sense cap esfera especial; plena = tirada especial assegurada
+function gLuckBar() {
+  const f = gPityF();
+  return `<div class="gluck ${f >= .85 ? 'hot' : ''}" style="--f:${f.toFixed(3)}" role="img" aria-label="Sort ${Math.round(f * 100)} %"><i></i></div>`;
+}
+function viewGacha() {
+  const n = gOwned(), dev = gDev(), pct = Math.round(n / GORBS.length * 100);
+  return `<div class="card gacha">
+    <i class="gglow" aria-hidden="true"></i>
+    <div class="cardhead"><h2>Gacha d'esferes</h2><span class="gkan" lang="ja" aria-hidden="true">運</span></div>
+    <div class="gside">
+      <div class="gcover"><img src="art/gacha.png" alt="" loading="lazy"></div>
+      <div class="gtxt"><div class="gtok"><b>${dev ? '∞' : gAvail()}</b><span>tirades</span></div>${gLuckBar()}</div></div>
+    <div class="gbtns"><button class="primary gten" onclick="gachaPull10()" ${gCan10() ? '' : 'disabled'}>${ic('play')}Tirar ×10</button><button class="gone" onclick="gachaPull()" ${gCan() ? '' : 'disabled'}>×1</button></div>
+    <button class="gcollbtn" onclick="gachaColl()" aria-label="Col·lecció ${n} de ${GORBS.length}"><span>Col·lecció</span><span class="gbar"><i style="width:${pct}%"></i></span><b>${n}<small>/${GORBS.length}</small></b>${ic('right')}</button>
+  </div>`;
+}
+// Full superposat: resultat de la tirada i col·lecció
+function gSheet(html, cls = '', style = '') {
+  let s = document.getElementById('gsheet');
+  if (!s) { s = document.createElement('div'); s.id = 'gsheet'; document.body.appendChild(s); document.addEventListener('keydown', e => { if (e.key === 'Escape') gClose(); }); }
+  s.className = 'gsheet ' + cls; s.setAttribute('style', style); s.innerHTML = html; s.hidden = false; document.body.classList.add('gopen');
+  return s;
+}
+function gTimersOff() { if (gW && gW.timers) gW.timers.forEach(clearTimeout); }
+function gClose() { gTimersOff(); const s = document.getElementById('gsheet'); if (s) s.hidden = true; document.body.classList.remove('gopen'); clearTimeout(gT); if (tab === 'profile') render(); }
+let gT;
+// ---- Tirada estil "wish": cinemàtica neutra (sense pistes) → esferes una a una (de menys a més rara) → resum ----
+let gW = null;
+// Cinemàtica de la tirada. Capes (de fons a primer pla): cel, estels amb profunditat, gran kanji, pètals, cercle màgic que es dibuixa,
+// canal de línies de velocitat, nucli d'energia que creix a cada impacte, meteors del color de cada tirada, ones d'impacte,
+// punts de progrés (un per tirada) i, segons la millor esfera, trons, feix de llum, ones de xoc i vinyeta. Res no diu quina esfera és.
+const W_RUNES = '運命星月火水木金土龙光';
+function gStarsShadow(n, big) {
+  return [...Array(n)].map(() => `${(gRand() * 100).toFixed(1)}vw ${(gRand() * 100).toFixed(1)}vh 0 ${(gRand() * (big ? 1.2 : .6)).toFixed(1)}px rgba(255,255,255,${(.35 + gRand() * .65).toFixed(2)})`).join(',');
+}
+function gCircleSvg() {
+  const oct = [0, 3, 6, 1, 4, 7, 2, 5].map(j => { const a = (j * 45 - 90) * Math.PI / 180; return `${(58 * Math.cos(a)).toFixed(1)},${(58 * Math.sin(a)).toFixed(1)}`; }).join(' ');
+  const runes = [...W_RUNES].map((c, j) => `<text x="0" y="-70" text-anchor="middle" transform="rotate(${j * (360 / W_RUNES.length)})">${c}</text>`).join('');
+  return `<svg class="wcircle" viewBox="-100 -100 200 200" aria-hidden="true">
+    <g class="cg a"><circle class="dr" r="94"/><circle r="89" stroke-dasharray="1.5 4.5"/></g>
+    <g class="cg b">${runes}<circle class="dr" r="80"/><circle r="62" stroke-dasharray="3 3"/></g>
+    <g class="cg c"><polygon class="dr" points="${oct}"/><circle class="dr" r="30"/></g></svg>`;
+}
+function gRip(col) {
+  const c = document.querySelector('#gsheet .wrips'); if (!c) return;
+  const e = document.createElement('i'); e.style.setProperty('--mc', col); c.appendChild(e); setTimeout(() => e.remove(), 950);
+}
+function gWishStart(res) {
+  const n = res.length, W = innerWidth, H = innerHeight, best = Math.max(...res.map(r => gTi(r.i)));
+  // Ritme: l'inici és molt ràpid (les esferes que no interessen passen com un llamp) i el final és lent;
+  // com més bona és la millor esfera, més lent i llarg és el final. Només les 3 millors (èpic o més) tenen càmera lenta.
+  const asc = res.slice().sort((a, b) => gTi(a.i) - gTi(b.i));   // la millor arriba l'última
+  const nImp = Math.min(3, asc.filter(r => gTi(r.i) >= 3).length);
+  const fast = asc.slice(0, asc.length - nImp), slow = asc.slice(asc.length - nImp);
+  const items = [];
+  fast.forEach((r, k) => items.push({ r, dl: .04 + k * .03, du: .3 }));
+  const fastEnd = fast.length ? .04 + (fast.length - 1) * .03 + .3 : .25;
+  let cur = Math.max(fastEnd, .35), firstSlow = null;
+  slow.forEach(r => { const ti = gTi(r.i), du = .6 + .09 * ti; if (firstSlow === null) firstSlow = cur; items.push({ r, dl: cur, du }); cur += du * .92 + .22 + .05 * ti; });
+  const lastArr = items.reduce((m, it) => Math.max(m, it.dl + it.du * .92), 0);
+  const hold = nImp ? .55 + .1 * best : .12;
+  const T = Math.min(8, lastArr + hold), ts = firstSlow === null ? Math.max(.2, T - .6) : firstSlow, te = Math.max(.5, T - ts - .45);
+  gW = { res: res.slice().sort((a, b) => gTi(a.i) - gTi(b.i) || a.i - b.i), k: 0, n, ready: 0, timers: [] };
+  const cols = items.map(it => G_TIERS[gTi(it.r.i)][2]);
+  const bc = best === 9 ? '#ffffff' : G_TIERS[best][2];
+  const met = items.map((it, k) => {
+    const sx = (gRand() - .5) * W * 1.4, sy = -H * (.55 + gRand() * .25), a = Math.atan2(-sy, -sx) * 180 / Math.PI;
+    return `<i class="${gTi(it.r.i) === 9 ? 'rb' : ''}" style="--mc:${cols[k]};--sx:${sx.toFixed(0)}px;--sy:${sy.toFixed(0)}px;--rot:${a.toFixed(1)}deg;--dl:${it.dl.toFixed(3)}s;--du:${it.du.toFixed(3)}s"></i>`;
+  }).join('');
+  const tun = [...Array(44)].map((_, k) => `<i style="--a:${Math.round(k * 8 + (k % 3) * 3)}deg;--dl:${(((k * 37) % 100) / 100 * Math.min(T, 1.2) * .5).toFixed(2)}s"></i>`).join('');
+  const petals = [...Array(24)].map(() => `<i style="--x:${(gRand() * 100).toFixed(1)}vw;--w:${(7 + gRand() * 9).toFixed(1)}px;--du:${(7 + gRand() * 6).toFixed(1)}s;--dl:${(-gRand() * 8).toFixed(1)}s;--dx:${((gRand() - .5) * 40).toFixed(0)}vw"></i>`).join('');
+  const dots = items.map((_, k) => `<i style="--dc:${cols[k]}"></i>`).join('');
+  const extra = (best >= 5 ? '<div class="wbolt"></div>' : '') + (best >= 6 ? '<div class="wbeam"></div><div class="wshock"></div><div class="wshock s2"></div><div class="wshock s3"></div>' : '') + (best >= 8 ? '<div class="wvig"></div>' : '');
+  gSheet(`<div class="gwish lv${best} ${best >= 3 ? 'shk' : ''}" style="--T:${T.toFixed(2)}s;--ts:${ts.toFixed(2)}s;--te:${te.toFixed(2)}s;--c1:${G_TIERS[0][2]};--sh:${[0, 0, 0, 3, 4, 5, 7, 9, 11, 13][best]}px;--e:0">
+    <div class="wsky"></div>
+    <div class="wst s1" style="box-shadow:${gStarsShadow(46)}"></div><div class="wst s2" style="box-shadow:${gStarsShadow(34)}"></div><div class="wst s3" style="box-shadow:${gStarsShadow(16, true)}"></div>
+    <div class="wkan" lang="ja" aria-hidden="true">運</div>
+    <div class="wpet" aria-hidden="true">${petals}</div>
+    ${gCircleSvg()}
+    <div class="wtun">${tun}</div>${extra}<div class="wring"></div>
+    <div class="wcore"><i></i></div>
+    <div class="wrips"></div><div class="wmet">${met}</div>
+    <div class="wdots" aria-hidden="true">${dots}</div>
+    <div class="wflash"></div>
+    <button class="wskip" onclick="gWishSkip()">Saltar ${ic('next')}</button></div>`, 'wish');
+  clearTimeout(gT); gT = setTimeout(gWishCards, T * 1000);
+  // Cada meteor que arriba al centre: ona, punt encès i el nucli creix
+  items.forEach((it, k) => gW.timers.push(setTimeout(() => {
+    const w = document.querySelector('#gsheet .gwish'); if (!w) return;
+    w.style.setProperty('--e', ((k + 1) / items.length).toFixed(2)); const d = w.querySelectorAll('.wdots i')[k]; if (d) d.classList.add('on');
+    gRip(cols[k]); if (navigator.vibrate && gTi(it.r.i) >= 4) navigator.vibrate(14);
+  }, (it.dl + it.du * .92) * 1000)));
+  gW.timers.push(setTimeout(() => { const w = document.querySelector('#gsheet .gwish'); if (w) w.classList.add('implode'); }, Math.max(0, T - .8) * 1000));
+  // El color de l'escena comença neutre i puja per les categories: les baixes ràpid, les altes durant el final lent
+  for (let j = 1; j <= best; j++) {
+    const at = j <= 2 || nImp === 0 ? .05 + .1 * j : ts + te * (.12 + .7 * (j - 3) / Math.max(1, best - 3));
+    gW.timers.push(setTimeout(() => {
+      const w = document.querySelector('#gsheet .gwish'); if (!w) return;
+      w.style.setProperty('--c1', j === 9 ? '#ffffff' : G_TIERS[j][2]); if (j === 9) w.classList.add('rbw');
+    }, at * 1000));
+  }
+  if (best >= 6 && navigator.vibrate) gW.timers.push(setTimeout(() => navigator.vibrate(best >= 8 ? [80, 50, 80, 50, 220] : [60, 40, 140]), Math.max(0, T - .5) * 1000));
+}
+function gWishSkip() { clearTimeout(gT); gTimersOff(); if (gW && gW.n > 1) gWishSummary(); else gWishCards(); }
+// Després de la cinemàtica: al ×10 es veuen tots els resultats de cop; a la tirada ×1, l'esfera sola
+function gWishCards() { if (!gW) return; clearTimeout(gT); gTimersOff(); gW.k = 0; if (gW.n > 1) gWishSummary(); else gCard(); }
+function gCardNext() {
+  if (!gW || Date.now() < gW.ready) return;
+  if (++gW.k >= gW.n) gWishSummary(); else gCard();
+}
+// Una esfera de la tirada, a pantalla completa
+function gCard() {
+  const r = gW.res[gW.k], i = r.i, t = gTier(i), ti = gTi(i), g = gs(), n = gW.n, single = n === 1;
+  const h1 = (i * 47 + ti * 23) % 360, nb = ti >= 4 ? 6 + ti * 3 : 0;
+  const burst = nb ? `<div class="gburst" aria-hidden="true">${[...Array(nb)].map((_, k) => `<i style="--a:${Math.round(k * 360 / nb + (k % 2) * 9)}deg;--d:${90 + (k % 3) * 38 + ti * 6}px"></i>`).join('')}</div>` : '';
+  gW.ready = Date.now() + (ti >= 6 ? 1500 : 650);
+  const acts = single
+    ? `<div class="row"><button onclick="gEquip(${i});gClose()">${ic('check')}Posar-la</button><button onclick="gClose()">Tancar</button></div>
+       <div class="row" style="margin-top:8px"><button class="small" onclick="gachaPull()" ${gCan() ? '' : 'disabled'}>Tirar ×1</button><button class="small" onclick="gachaPull10()" ${gCan10() ? '' : 'disabled'}>Tirar ×10</button></div>`
+    : `<p class="gtap">${gW.k === n - 1 ? 'Toca per veure el resum' : 'Toca per continuar'}</p>`;
+  gSheet(`${ti >= 6 ? '<div class="gflash" aria-hidden="true"></div>' : ''}
+    ${n > 1 ? `<button class="wskip" onclick="gWishSkip()">Saltar ${ic('next')}</button>` : ''}
+    <div class="gbox" style="--tc:${t[2]}" ${n > 1 ? 'onclick="gCardNext()"' : ''}>
+      ${n > 1 ? `<div class="gprog" aria-hidden="true">${gW.res.map((_, k) => `<i class="${k <= gW.k ? 'on' : ''}"></i>`).join('')}</div>` : ''}
+      <div class="gstage"><div class="gorbwrap">${orbHtml(i, 150, 'live')}</div>${burst}</div>
+      <div class="gres"><span class="gtier">${t[0]}</span><h3>${esc(GORBS[i])}</h3>
+        <p class="godds">1 entre ${gFmt(gOdds(i))}</p>
+        <p class="gnew">${r.isNew ? 'Esfera nova!' : `Repetida · ×${g.own[i]}`}</p>${acts}</div></div>`,
+    `card t-${t[0].replace(' ', '')} tier${ti}`, `--gh:${h1};--ga:${[0, 0, .1, .22, .3, .4, .5, .58, .66, .7][ti]}`);
+  requestAnimationFrame(() => requestAnimationFrame(() => { const s = document.getElementById('gsheet'); if (s) s.classList.add('open'); }));
+}
+// Resum de la tirada: totes les esferes, de més a menys rares
+function gWishSummary() {
+  clearTimeout(gT); if (!gW) return;
+  const rs = gW.res.slice().sort((a, b) => gTi(b.i) - gTi(a.i) || a.i - b.i);
+  const best = gTi(rs[0].i);
+  gSheet(`<div class="gsum"><h2>Resultat</h2>
+    <div class="gsgrid">${rs.map((r, k) => { const t = gTier(r.i); return `<button class="gsc ${gTi(r.i) >= 6 ? 'hi' : ''}" style="--tc:${t[2]};--d:${((rs.length - 1 - k) * .04).toFixed(2)}s" onclick="gTapSum(${r.i})" aria-label="${esc(GORBS[r.i])}">${orbHtml(r.i, 52, 'still')}<b>${esc(GORBS[r.i])}</b><small>${t[0]}</small>${r.isNew ? '<em>NOVA</em>' : ''}</button>`; }).join('')}</div>
+    ${gLuckBar()}
+    <p class="muted gsnote">Toca una esfera per posar-la al perfil</p>
+    <div class="row"><button onclick="gClose()">Tancar</button><button onclick="gachaPull()" ${gCan() ? '' : 'disabled'}>Tirar ×1</button><button class="primary" onclick="gachaPull10()" ${gCan10() ? '' : 'disabled'}>Tirar ×10</button></div></div>`,
+    'sum', `--gh:${(rs[0].i * 47 + best * 23) % 360};--ga:${[0, 0, .08, .16, .22, .3, .38, .44, .5, .55][best]}`);
+}
+function gTapSum(i) { gEquip(i); toast(gs().eq === i ? `Posada: ${GORBS[i]}` : 'Esfera treta del perfil'); }
+function gEquip(i) { gs().eq = gs().eq === i ? -1 : i; save(); if (tab === 'profile') render(); }
+function gTap(i) {
+  if (!gs().own[i]) return;
+  const l = document.querySelector('.glist'), st = l ? l.scrollTop : 0;
+  gEquip(i); gachaColl(); const n = document.querySelector('.glist'); if (n) n.scrollTop = st;
+}
+// Col·lecció: quadrícula d'esferes agrupades per categoria
+function gachaColl() {
+  const g = gs();
+  const chips = G_TIERS.map(t => { const ids = GORBS.map((_, i) => i).filter(i => gTier(i) === t); return `<span class="gtc" style="--tc:${t[2]}"><i class="gdot"></i>${t[0]}<b>${ids.filter(i => g.own[i]).length}/${ids.length}</b></span>`; }).join('');
+  const groups = G_TIERS.map(t => {
+    const ids = GORBS.map((_, i) => i).filter(i => gTier(i) === t);
+    return `<h3 class="gtg" style="--tc:${t[2]}"><i class="gdot"></i>${t[0]}<small>${ids.filter(i => g.own[i]).length}/${ids.length}</small></h3>` + ids.map(i => {
+      const own = g.own[i];
+      return `<button class="ocell ${own ? 'own' : ''} ${g.eq === i ? 'eq' : ''}" ${own ? `onclick="gTap(${i})"` : 'tabindex="-1"'} aria-label="${own ? esc(GORBS[i]) : 'Esfera per descobrir'}">${orbHtml(i, 64, own ? 'still' : 'locked')}
+        <b>${own ? esc(GORBS[i]) : '???'}</b><small>1/${gFmt(gOdds(i))}${own > 1 ? ` · ×${own}` : ''}</small>${g.eq === i ? `<em>${ic('check')}</em>` : ''}</button>`;
+    }).join('');
+  }).join('');
+  gSheet(`<div class="gcoll"><div class="gch"><h2>Col·lecció <span>${gOwned()}/${GORBS.length}</span></h2><button aria-label="Tancar" onclick="gClose()">${ic('x')}</button></div>
+    <div class="gtiers">${chips}</div>
+    ${g.eq >= 0 ? `<p class="geq">${orbHtml(g.eq, 26, 'still')}<span>Al perfil: <b>${esc(GORBS[g.eq])}</b></span> <button class="small" onclick="gEquip(${g.eq});gachaColl()">Treure</button></p>` : ''}
+    <div class="glist ogrid">${groups}</div></div>`);
 }
 // ---------- Instal·lar l'app ----------
 let installEv = null;
@@ -1381,8 +1816,9 @@ function viewFingers() {
   </div>`;
 }
 function saveProfile() {
-  S.profile = { maxGrade: $('pg').value, goal: $('po').value, days: +$('pdays').value, start: $('pstart').value || today() };
-  save(); go('plan'); toast('Perfil desat');
+  const d = pdraft();
+  S.profile = { maxGrade: d.maxGrade, goal: d.goal, days: +d.days || 3, start: d.start || today(), name: (d.name || '').trim(), gym: (d.gym || '').trim(), since: String(d.since || '').trim() };
+  pd = null; profEdit = false; save(); go('profile'); toast(S.profile.name ? `Desat, ${S.profile.name}` : 'Perfil desat');
 }
 function exportData() {
   const a = document.createElement('a');
