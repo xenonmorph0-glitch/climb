@@ -1361,7 +1361,7 @@ const gDev = () => !!window.DEV_UNLIMITED;   // només el posa dev.js (localhost
 const G_MIN_MIN = 60, G_CLIMB = { 'Marró': 2, Vermell: 10, Blanc: 100 };
 const gEarned = () => S.sessions.reduce((a, s) => (s.duration || 0) >= G_MIN_MIN
   ? a + G_PER_SESSION + (s.climbs || []).reduce((b, c) => b + (G_CLIMB[String(c.grade || '').split(' ')[0]] || 0), 0) : a, 0);
-const G_START = 120;   // tirades amb què comença tothom (100 + 20 de regal)
+const G_START = 170;   // tirades amb què comença tothom (100 + 20 + 50 de regal)
 const gTokens = () => Math.max(0, gEarned() + G_START - gs().spent);
 // Barra de sort: s'omple amb cada tirada sense cap esfera especial (èpic o més rara) i com més plena, més probabilitat d'especial.
 // Quant s'omple depèn del que surt: com més comuna l'esfera, més puja; en sortir un especial es buida del tot.
@@ -1480,7 +1480,7 @@ function gCircleSvg() {
   const oct = [0, 3, 6, 2, 5, 1, 4].map(j => { const a = (j * 360 / 7 - 90) * Math.PI / 180; return `${(62 * Math.cos(a)).toFixed(2)},${(62 * Math.sin(a)).toFixed(2)}`; }).join(' ');
   const runes = [...W_RUNES].map((c, j) => `<text x="0" y="-70" text-anchor="middle" transform="rotate(${j * (360 / W_RUNES.length)})">${c}</text>`).join('');
   return `<svg class="wcircle" viewBox="-100 -100 200 200" aria-hidden="true">
-    <g class="cg a"><circle class="dr" r="94"/><circle r="89" stroke-dasharray="1.5 4.5"/></g>
+    <g class="cg a"><circle r="98" stroke-dasharray=".8 7.75" stroke-width="2.6" opacity=".7"/><circle class="dr" r="94"/><circle r="89" stroke-dasharray="1.5 4.5"/></g>
     <g class="cg b">${runes}<circle class="dr" r="80"/><circle r="62" stroke-dasharray="3 3"/></g>
     <g class="cg c"><polygon class="dr" pathLength="620" stroke-linejoin="miter" points="${oct}"/><circle class="dr" r="22"/></g></svg>`;
 }
@@ -1535,6 +1535,8 @@ function gWishStart(res) {
     ${best >= 3 ? '<div class="wrays" aria-hidden="true"></div>' : ''}
     ${gCircleSvg()}
     <div class="worb" aria-hidden="true">${items.map((_, k) => `<i style="--a:${(k * 360 / items.length).toFixed(1)}deg;--dc:${cols[k]}"><b></b></i>`).join('')}</div>
+    <div class="wshoot" aria-hidden="true">${[...Array(3)].map((_, k) => `<i style="--x:${(10 + gRand() * 70).toFixed(0)}vw;--y:${(4 + gRand() * 40).toFixed(0)}vh;--dl:${(.3 + k * 1.3 + gRand()).toFixed(2)}s;--pt:${(3.2 + gRand() * 2).toFixed(2)}s"></i>`).join('')}</div>
+    ${best >= 3 ? `<div class="wspk" aria-hidden="true">${[...Array(12)].map((_, k) => `<i style="--a:${(k * 30 + gRand() * 20).toFixed(0)}deg;--d:${(34 + gRand() * 26).toFixed(0)}vmin;--dl:${(gRand() * 1.6).toFixed(2)}s;--pt:${(1.3 + gRand() * .9).toFixed(2)}s"></i>`).join('')}</div>` : ''}
     ${best >= 3 ? '<div class="wdim"></div><div class="wnova"></div>' : ''}${best >= 4 ? '<div class="wstreak"></div>' : ''}
     <div class="wtun">${tun}</div>${extra}<div class="wring"></div>
     <div class="wcore"><i></i></div>

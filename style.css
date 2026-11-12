@@ -1248,3 +1248,23 @@ img { -webkit-user-drag: none; }
 /* el selector d'exercicis no pot fer mes ampla la targeta del dia */
 .card.day .picker { flex: 1 1 100%; width: 100%; max-width: 100%; min-width: 0; }
 .card.day .picker .gtabs { max-width: 100%; }
+
+/* ================= Nitidesa + mes moviment lleuger ================= */
+/* will-change feia que el navegador pintes les capes a mida petita i despres les ampliés (pixelat): ara les pinta a la mida final */
+.gwish > * { will-change: auto; }
+.wtints i, .wflash, .wdim, .wvig, .wbolt { will-change: opacity; }
+.wst { will-change: auto; }
+.gwish.rbw::after { will-change: auto; }
+.wcircle { shape-rendering: geometricPrecision; text-rendering: geometricPrecision; }
+.wcircle .cg.c { animation: ospin 60s linear infinite reverse; }
+.wkan { text-rendering: geometricPrecision; }
+/* estels fugaços al fons */
+.wshoot { position: absolute; inset: 0; pointer-events: none; }
+.wshoot i { position: absolute; left: var(--x); top: var(--y); width: 22vmin; height: 2px; border-radius: 2px; background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .9)); opacity: 0; transform-origin: 100% 50%; animation: wshoot var(--pt) ease-in var(--dl) infinite; }
+@keyframes wshoot { 0% { opacity: 0; transform: rotate(-32deg) translateX(-30vmin) scaleX(.3); } 6% { opacity: .9; } 16% { opacity: 0; transform: rotate(-32deg) translateX(40vmin) scaleX(1); } 100% { opacity: 0; transform: rotate(-32deg) translateX(40vmin) scaleX(1); } }
+/* guspires que surten del nucli durant la part lenta */
+.wspk { position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 2; pointer-events: none; opacity: 0; animation: fadeIn .6s ease var(--ts) both; }
+.wspk i { position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 50%; background: #fff; opacity: 0; animation: wspk var(--pt) ease-out var(--dl) infinite; }
+@keyframes wspk { 0% { opacity: 0; transform: rotate(var(--a)) translateX(4vmin) scale(1.4); } 15% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)) scale(.3); } }
+.gwish.implode .wspk { opacity: 0 !important; transition: opacity .2s; animation: none; }
+@media (prefers-reduced-motion: reduce) { .wshoot, .wspk { display: none; } }
