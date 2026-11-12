@@ -1120,3 +1120,12 @@ body.gwishing > :not(#gsheet) { visibility: hidden; }
 .wmet i::after { box-shadow: 0 0 10px 3px var(--mc); }
 /* arc de Sant Martin de l'unic: sense barreja de modes */
 .gwish.rbw::after { mix-blend-mode: normal; opacity: .14; will-change: transform; }
+
+/* ================= Canvi de color sense repintar el cel: el resplendor son capes que es fonen per opacitat ================= */
+.wsky, .gwish.lv9 .wsky { background: radial-gradient(circle at 50% 50%, #1b1f3a 0, #0b0c1c 40%, #05060d 72%); }
+.wtints { position: absolute; inset: 0; pointer-events: none; }
+.wtints i { position: absolute; left: 50%; top: 50%; width: 150vmin; height: 150vmin; margin: -75vmin 0 0 -75vmin; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--tc) 40%, transparent) 0, color-mix(in srgb, var(--tc) 14%, transparent) 40%, transparent 68%); opacity: 0; transition: opacity .5s ease; will-change: opacity; }
+.wtints i.on { opacity: 1; }
+/* el kanji i els petals ja no depenen del color (no es repinten a cada canvi) */
+.wkan { color: #dfe4ff; }
+.gwish .wpet i, .gwish.lv4 .wpet i, .gwish.lv5 .wpet i, .gwish.lv6 .wpet i, .gwish.lv7 .wpet i, .gwish.lv8 .wpet i, .gwish.lv9 .wpet i { background: radial-gradient(ellipse at 30% 30%, #fff, #ffc2d6); }

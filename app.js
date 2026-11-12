@@ -1271,7 +1271,7 @@ const gDev = () => !!window.DEV_UNLIMITED;   // només el posa dev.js (localhost
 const G_MIN_MIN = 60, G_CLIMB = { 'Marró': 2, Vermell: 10, Blanc: 100 };
 const gEarned = () => S.sessions.reduce((a, s) => (s.duration || 0) >= G_MIN_MIN
   ? a + G_PER_SESSION + (s.climbs || []).reduce((b, c) => b + (G_CLIMB[String(c.grade || '').split(' ')[0]] || 0), 0) : a, 0);
-const G_START = 100;   // tirades amb què comença tothom
+const G_START = 120;   // tirades amb què comença tothom (100 + 20 de regal)
 const gTokens = () => Math.max(0, gEarned() + G_START - gs().spent);
 // Barra de sort: s'omple amb cada tirada sense cap esfera especial (èpic o més rara) i com més plena, més probabilitat d'especial.
 // Quant s'omple depèn del que surt: com més comuna l'esfera, més puja; en sortir un especial es buida del tot.
@@ -1425,6 +1425,7 @@ function gWishStart(res) {
   const extra = (best >= 5 ? '<div class="wbolt"></div>' : '') + (best >= 6 ? '<div class="wbeam"></div><div class="wshock"></div><div class="wshock s2"></div><div class="wshock s3"></div>' : '') + (best >= 8 ? '<div class="wvig"></div>' : '');
   gSheet(`<div class="gwish lv${best} ${best >= 3 ? 'shk' : ''}" style="--T:${T.toFixed(2)}s;--ts:${ts.toFixed(2)}s;--te:${te.toFixed(2)}s;--c1:${G_TIERS[0][2]};--sh:${[0, 0, 0, 3, 4, 5, 7, 9, 11, 13][best]}px;--e:0">
     <div class="wsky"></div>
+    <div class="wtints" aria-hidden="true">${[...Array(best)].map((_, k) => `<i style="--tc:${k + 1 === 9 ? '#ffffff' : G_TIERS[k + 1][2]}"></i>`).join('')}</div>
     <div class="wst s1" style="box-shadow:${gStarsShadow(30)}"></div><div class="wst s2" style="box-shadow:${gStarsShadow(20)}"></div><div class="wst s3" style="box-shadow:${gStarsShadow(10, true)}"></div>
     <div class="wkan" lang="ja" aria-hidden="true">運</div>
     <div class="wpet" aria-hidden="true">${petals}</div>
@@ -1449,6 +1450,8 @@ function gWishStart(res) {
     gW.timers.push(setTimeout(() => {
       const w = document.querySelector('#gsheet .gwish'); if (!w) return;
       w.style.setProperty('--c1', j === 9 ? '#ffffff' : G_TIERS[j][2]); if (j === 9) w.classList.add('rbw');
+      // el resplendor de fons canvia amb un fos d'opacitat (barat), no repintant tot el cel
+      const ts_ = w.querySelectorAll('.wtints i'); ts_.forEach((e, k) => e.classList.toggle('on', k === j - 1));
     }, at * 1000));
   }
   if (best >= 6 && navigator.vibrate) gW.timers.push(setTimeout(() => navigator.vibrate(best >= 8 ? [80, 50, 80, 50, 220] : [60, 40, 140]), Math.max(0, T - .5) * 1000));
