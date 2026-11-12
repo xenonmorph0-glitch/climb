@@ -1211,3 +1211,40 @@ button, nav#tabs, .hero, .card h2 { -webkit-user-select: none; user-select: none
 img { -webkit-user-drag: none; }
 .tr { display: table; margin: 7px auto 0; }
 .card > .seg + details { margin-top: 12px; }
+
+/* ================= Cinematica mes epica (tot amb transform/opacity) ================= */
+/* raigs de llum que giren darrere el cercle i creixen durant la part lenta */
+.wrays { position: absolute; left: 50%; top: 50%; width: 170vmax; height: 170vmax; margin: -85vmax 0 0 -85vmax; opacity: 0;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0) 0 6deg, rgba(255, 255, 255, .13) 8.5deg 10deg, rgba(255, 255, 255, 0) 12.5deg 18deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0, rgba(0, 0, 0, .5) 22%, transparent 58%); mask-image: radial-gradient(circle, #000 0, rgba(0, 0, 0, .5) 22%, transparent 58%);
+  animation: wraysin var(--te) ease-in var(--ts) both, ospin 46s linear infinite; }
+@keyframes wraysin { 0% { opacity: 0; scale: .55; } 55% { opacity: .55; } 100% { opacity: 1; scale: 1.2; } }
+/* cada tirada que arriba queda orbitant el cercle; al final totes cauen al nucli */
+.worb { position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 3; animation: ospin 9s linear infinite; }
+.worb i { position: absolute; left: 0; top: 0; width: 0; height: 0; transform: rotate(var(--a)) translateX(44.5vmin); transition: transform .65s cubic-bezier(.6, 0, 1, .4); }
+.worb b { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px var(--dc), 0 0 10px 3px var(--dc); opacity: 0; scale: 0; transition: opacity .3s, scale .45s cubic-bezier(.2, 1.8, .4, 1); }
+.worb i.on b { opacity: 1; scale: 1; }
+.gwish.implode .worb i { transform: rotate(calc(var(--a) + 200deg)) translateX(0); }
+.gwish.implode .worb b { opacity: 0; transition: opacity .25s .45s; }
+/* silenci abans de l'esclat: la pantalla s'enfosqueix un instant */
+.wdim { position: absolute; inset: 0; background: #000; opacity: 0; z-index: 1; pointer-events: none; animation: wdim .75s ease-in-out calc(var(--T) - 1.3s) both; }
+@keyframes wdim { 0% { opacity: 0; } 55% { opacity: .62; } 100% { opacity: .2; } }
+/* esclat: anell de llum i centelleig horitzontal */
+.wnova { position: absolute; left: 50%; top: 50%; width: 24vmin; height: 24vmin; margin: -12vmin 0 0 -12vmin; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 18px 4px rgba(255, 255, 255, .7), inset 0 0 14px rgba(255, 255, 255, .6); opacity: 0; z-index: 6; animation: wnova .6s cubic-bezier(.1, .7, .3, 1) calc(var(--T) - .6s) both; }
+@keyframes wnova { 0% { opacity: 0; transform: scale(.1); } 15% { opacity: 1; } 100% { opacity: 0; transform: scale(9); } }
+.wstreak { position: absolute; left: -20vw; right: -20vw; top: 50%; height: 4px; margin-top: -2px; border-radius: 4px; z-index: 6; opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .9) 35%, #fff 50%, rgba(255, 255, 255, .9) 65%, transparent); box-shadow: 0 0 16px 3px rgba(255, 255, 255, .55);
+  animation: wstreak .7s ease-out calc(var(--T) - .75s) both; }
+@keyframes wstreak { 0% { opacity: 0; transform: scaleX(0); } 35% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1.1) scaleY(.3); } }
+/* aurora per a les tirades mes rares */
+.waur { position: absolute; inset: 0; pointer-events: none; opacity: 0; animation: fadeIn 1.6s ease calc(var(--ts) + var(--te) * .3) both; }
+.waur i { position: absolute; left: -30vw; right: -30vw; height: 46vh; top: -8vh; background: radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--a1) 34%, transparent) 0, transparent 62%); animation: waur 7s ease-in-out infinite alternate; }
+.waur i + i { top: auto; bottom: -10vh; background: radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--a2) 30%, transparent) 0, transparent 62%); animation-duration: 9s; animation-direction: alternate-reverse; }
+@keyframes waur { from { transform: translateX(-12vw) scaleY(.85); } to { transform: translateX(12vw) scaleY(1.15); } }
+/* el cercle batega amb cada impacte i el nucli es fa mes gran al final */
+.wcircle { scale: calc(1 + var(--e, 0) * .08); transition: scale .5s cubic-bezier(.2, 1.6, .4, 1); }
+@media (prefers-reduced-motion: reduce) { .wrays, .worb, .waur i { animation: none; } .wdim, .wnova, .wstreak { display: none; } }
+
+/* el selector d'exercicis no pot fer mes ampla la targeta del dia */
+.card.day .picker { flex: 1 1 100%; width: 100%; max-width: 100%; min-width: 0; }
+.card.day .picker .gtabs { max-width: 100%; }

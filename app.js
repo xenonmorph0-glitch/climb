@@ -1530,8 +1530,12 @@ function gWishStart(res) {
     <div class="wst s1" style="box-shadow:${gStarsShadow(30)}"></div><div class="wst s2" style="box-shadow:${gStarsShadow(20)}"></div><div class="wst s3" style="box-shadow:${gStarsShadow(10, true)}"></div>
     <div class="wkan" lang="ja" aria-hidden="true">運</div>
     <div class="wpet" aria-hidden="true">${petals}</div>
+    ${best >= 7 ? `<div class="waur" aria-hidden="true" style="--a1:${G_TIERS[best - 1][2]};--a2:${best === 9 ? '#ff9ad0' : G_TIERS[best][2]}"><i></i><i></i></div>` : ''}
     ${cosmos ? `<div class="wcos" aria-hidden="true">${cosmos}</div>` : ''}
+    ${best >= 3 ? '<div class="wrays" aria-hidden="true"></div>' : ''}
     ${gCircleSvg()}
+    <div class="worb" aria-hidden="true">${items.map((_, k) => `<i style="--a:${(k * 360 / items.length).toFixed(1)}deg;--dc:${cols[k]}"><b></b></i>`).join('')}</div>
+    ${best >= 3 ? '<div class="wdim"></div><div class="wnova"></div>' : ''}${best >= 4 ? '<div class="wstreak"></div>' : ''}
     <div class="wtun">${tun}</div>${extra}<div class="wring"></div>
     <div class="wcore"><i></i></div>
     <div class="wrips"></div><div class="wmet">${met}</div>
@@ -1543,6 +1547,7 @@ function gWishStart(res) {
   items.forEach((it, k) => gW.timers.push(setTimeout(() => {
     const w = document.querySelector('#gsheet .gwish'); if (!w) return;
     w.style.setProperty('--e', ((k + 1) / items.length).toFixed(2)); const d = w.querySelectorAll('.wdots i')[k]; if (d) d.classList.add('on');
+    const ob = w.querySelectorAll('.worb i')[k]; if (ob) ob.classList.add('on');   // l'energia de cada tirada queda orbitant el cercle
     gRip(cols[k]); if (navigator.vibrate && gTi(it.r.i) >= 4) navigator.vibrate(14);
   }, (it.dl + it.du * .92) * 1000)));
   gW.timers.push(setTimeout(() => { const w = document.querySelector('#gsheet .gwish'); if (w) w.classList.add('implode'); }, Math.max(0, T - .8) * 1000));
