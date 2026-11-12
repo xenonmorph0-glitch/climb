@@ -1146,3 +1146,19 @@ body.gwishing > :not(#gsheet) { visibility: hidden; }
 .wkp .wkl, .card:has(> .rings) .wkp .wkl { margin-top: 10px; font-size: 10px; }
 
 .card .wkp { display: block; }
+
+/* ================= Fluidesa: transicions mes curtes i lleugeres, sense desenfocaments innecessaris ================= */
+@media (prefers-reduced-motion: no-preference) {
+  #view.enter > * { animation-duration: .34s; animation-delay: calc(var(--i, 0) * 32ms); }
+  #view.enter > .banner { animation-duration: .34s; }
+  #view.enter .scene .ring { animation-duration: .6s; }
+  #view.enter .scene img, #view.enter .art { animation-duration: .45s; animation-delay: .08s; }
+  #view.enter .banner .hanko { animation-delay: .3s; animation-duration: .35s; }
+  #view.enter .banner .vert, #view.enter .banner .date, #view.enter .banner .big, #view.enter .banner .sub { animation-duration: .3s; animation-delay: .08s; }
+  #view.enter .wk i { animation-delay: calc(var(--k) * 35ms + .2s); animation-duration: .45s; }
+  .ghost { animation-duration: .18s; will-change: transform, opacity; }
+}
+@keyframes outro { to { opacity: 0; transform: translateX(calc(var(--dir, 1) * -22px)); } }
+/* el full ja es quasi opac: el desenfocament de fons nomes costava rendiment */
+.gsheet { -webkit-backdrop-filter: none; backdrop-filter: none; }
+button, .card, nav#tabs button { touch-action: manipulation; }

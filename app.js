@@ -93,6 +93,8 @@ function animateIn(dir) {
   bs.forEach((b, i) => b.style.setProperty('--d', Math.abs(i - a)));
   nav.classList.remove('wave'); void nav.offsetWidth; nav.classList.add('wave');
   window.scrollTo(0, 0);
+  // L'animació d'entrada s'acaba: si la classe es quedés, cada nou element (en tocar un botó) tornaria a animar-se
+  clearTimeout(animateIn.t); animateIn.t = setTimeout(() => { v.classList.remove('enter'); [...v.children].forEach(c => c.style.removeProperty('--i')); }, 1200);
 }
 // Sortida: clona la vista actual, la deixa fixa on era i l'esvaeix mentre la nova ja és renderitzada
 function leaveGhost(dir) {
@@ -153,16 +155,46 @@ function banner() {
 }
 // Il·lustracions de tinta com a fons suau d'algunes targetes (segons el títol)
 const CARD_ART = { 'Estat': 'mussol', 'El meu perfil': 'eclipsi','Escalada d\'avui': 'mans-pinca', 'Força de dits': 'mans-pinca', 'Afegir via': 'mans-roca', 'Progressió': 'catedral', 'Recordatoris': 'lluna', 'Lesions': 'espina', 'Son i recuperació': 'mussol' };
-function cardArt() {
-  document.querySelectorAll('#view .card h2').forEach(h => {
+function cardArt(root = document.getElementById('view')) {
+  root.querySelectorAll('.card h2').forEach(h => {
     const k = CARD_ART[h.textContent.trim()], c = h.closest('.card');
     if (k && c) { c.classList.add('bgart'); c.classList.toggle('wide', k === 'forat'); c.style.setProperty('--bgart', `url(art/${k}.png)`); }
   });
 }
+// Actualitza el DOM només on ha canviat (així en tocar un botó no es reinicia la pantalla ni les animacions, i es conserva el scroll)
+function syncAttrs(a, b) {
+  for (const at of [...a.attributes]) if (!b.hasAttribute(at.name)) a.removeAttribute(at.name);
+  for (const at of b.attributes) if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
+}
+function morph(a, b) {
+  const bn = b.childNodes;
+  for (let i = 0; i < bn.length; i++) {
+    const x = a.childNodes[i], y = bn[i];
+    if (!x) { a.appendChild(y.cloneNode(true)); continue; }
+    if (x.nodeName !== y.nodeName) { a.replaceChild(y.cloneNode(true), x); continue; }
+    if (x.nodeType !== 1) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; continue; }
+    if (x.isEqualNode(y)) continue;
+    syncAttrs(x, y); morph(x, y);
+  }
+  while (a.childNodes.length > bn.length) a.removeChild(a.lastChild);
+}
+// Els camps tornen al valor pintat (igual que abans, quan es refeia tot)
+function resetControls(root) {
+  root.querySelectorAll('input,textarea,select').forEach(el => {
+    if (el.tagName === 'SELECT') { if (!el.multiple && el.options.length) { const d = [...el.options].find(o => o.defaultSelected) || el.options[0]; if (el.value !== d.value) d.selected = true; } }
+    else if (el.type === 'checkbox' || el.type === 'radio') { if (el.checked !== el.defaultChecked) el.checked = el.defaultChecked; }
+    else if (el.type !== 'file' && el.value !== el.defaultValue) el.value = el.defaultValue;
+  });
+}
+let lastTab = null;
 function render() {
   clearInterval(ticker);
-  $('view').innerHTML = banner() + { home: viewHome, session: viewSession, timer: viewItv, history: viewHistory, plan: viewPlan, profile: viewProfile }[tab]();
-  cardArt();
+  const v = $('view'), html = banner() + { home: viewHome, session: viewSession, timer: viewItv, history: viewHistory, plan: viewPlan, profile: viewProfile }[tab]();
+  if (lastTab === tab && v.children.length) {
+    const tpl = document.createElement('div'); tpl.innerHTML = html; cardArt(tpl);
+    morph(v, tpl); resetControls(v);
+  } else { v.innerHTML = html; cardArt(v); }
+  lastTab = tab;
   const gt = document.querySelector('.gtabs'); if (gt) gt.scrollLeft = planTabX;
   profileFx();
   if (tab === 'timer') itvSync(itvRun ? (itvRun.end - Date.now()) / 1000 : 0);
