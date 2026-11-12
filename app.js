@@ -219,8 +219,13 @@ function viewHome() {
       <div class="stat"><svg class="flame${st.streak ? '' : ' off'}" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="flg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#d03a23"/><stop offset=".6" stop-color="#ee6a2c"/><stop offset="1" stop-color="#f2b84b"/></linearGradient></defs><path d="M12 1.5c.6 4.2 6.2 6.6 6.2 12.7a6.2 6.2 0 0 1-12.4 0c0-3 1.8-4.6 2.4-7.4 1.9 1.1 3 2.3 3.2 4.3 1.2-2.6 1.1-6.2.6-9.6z" fill="url(#flg)"/><path d="M12 22.2a3.3 3.3 0 0 1-3.3-3.3c0-2.1 1.9-3.2 3.3-5.3 1.4 2.1 3.3 3.2 3.3 5.3a3.3 3.3 0 0 1-3.3 3.3z" fill="#f7dc8a"/></svg><b>${st.streak}</b><span>ratxa</span></div>
     </div>
     <p class="muted"><span class="tag ${cls}">${state}</span>${m.pain >= 5 ? ` <span class="tag bad">Dolor ${m.pain}/10</span>` : ''}</p>
-    <div class="wk${weeks.some(w => w > 0) ? '' : ' empty'}">${weeks.map((w, i) => `<i class="${i === 7 ? 'now' : ''}" style="--k:${i};height:${weeks.some(x => x > 0) ? Math.max((w / max) * 100, 7) : 7}%"></i>`).join('')}</div>
-    <div class="wkl"><span>8 setmanes</span><span>ara</span></div>
+    ${(() => {
+      const any = weeks.some(w => w > 0), ghost = [34, 48, 40, 58, 46, 64, 52, 72];
+      return `<div class="wkp${any ? '' : ' empty'}">
+      <div class="wkh"><span>Càrrega setmanal</span><span>8 setmanes</span></div>
+      <div class="wk">${weeks.map((w, i) => `<i class="${i === 7 ? 'now' : ''}${w > 0 ? ' has' : ''}" style="--k:${i};height:${any ? Math.max((w / max) * 100, 12) : ghost[i]}%"></i>`).join('')}${any ? '' : '<em>Encara no hi ha sessions</em>'}</div>
+      <div class="wkl"><span>fa 8 setmanes</span><span>ara</span></div></div>`;
+    })()}
   </div>
   ${viewGacha()}`;
 }
