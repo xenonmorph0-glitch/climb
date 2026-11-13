@@ -1377,7 +1377,14 @@ const gAvail = () => gTokens() + gFree();
 const gCan = () => gDev() || gAvail() > 0;
 const gOwned = () => Object.keys(gs().own).length;
 function gRand() { const a = new Uint32Array(2); crypto.getRandomValues(a); return (a[0] * 2097152 + (a[1] >>> 11)) / 9007199254740992; }   // 53 bits
-function gRoll(u = gRand()) { let c = 0; for (let i = 0; i < GP.length; i++) { c += GP[i]; if (u < c) return i; } return 0; }
+// Probabilitat real de tirada: totes les esferes de rar cap amunt surten el doble del que diu el seu "1 entre N"
+// (els números mostrats no canvien). El que guanyen ho perden, en proporció, les comunes i poc comunes.
+const G_BOOST = 2;
+const GPR = (() => {
+  const hi = GP.map((p, i) => gTi(i) >= 2), H = GP.reduce((a, p, i) => a + (hi[i] ? p : 0), 0), k = (1 - H * G_BOOST) / (1 - H);
+  return GP.map((p, i) => hi[i] ? p * G_BOOST : p * k);
+})();
+function gRoll(u = gRand()) { let c = 0; for (let i = 0; i < GPR.length; i++) { c += GPR[i]; if (u < c) return i; } return 0; }
 const gName = () => { const e = gs().eq; return e >= 0 ? GORBS[e] : ''; };
 // Tirades: ×1 o ×10. El resultat es desa de seguida però no es mostra fins al final de la cinemàtica.
 const gCan10 = () => gDev() || gAvail() >= 10;
