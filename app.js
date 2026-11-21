@@ -295,7 +295,10 @@ const WARMUP = [
 const warmSteps = steps => `<ul class="wsteps">${steps.map(s => `<li${s.img ? ' onclick="this.classList.toggle(\'zoom\')"' : ''}><span class="wico${s.img ? ' pic' : ''}">${s.img ? `<img src="escalfament/${s.img}" alt="" loading="lazy">` : ICONS[s.i]}</span><span>${s.t}</span></li>`).join('')}</ul>`;
 let picking = false;
 // Iniciar sessió: primer es mostra l'escalfament
-function startSession() { picking = true; wzStart(); go('session'); }
+// Començar és un sol toc: la sessió arrenca de seguida; l'escalfament guiat és opcional des de dins
+function startSession() { beginSession(); }
+function openWarmup() { picking = true; wzStart(); render(); scrollTo(0, 0); }
+function warmupBack() { wzStop(); picking = false; render(); }
 // Escalfament guiat: cada exercici comença sol (3 s de preparació), va fent les sèries i passa al següent.
 // Els exercicis amb temps (s) compten enrere i avancen sols; els de repeticions esperen el "Sèrie feta".
 const WZ_READY = 3, WZ_C = 2 * Math.PI * 88, WZ_RESTS_KEY = 'escalada-wzrests';
@@ -323,7 +326,7 @@ function wzBegin() { wz.enter = true; wzPhase('ready', WZ_READY); wzLoop(); wzDr
 function wzStop() { clearInterval(wzTimer); wz = null; wakeSync(); }
 function wzAdvance() {
   wz.i++; wz.set = 1; wz.enter = true;
-  if (wz.i >= WARMUP.length) { wz.phase = 'done'; wz.end = 0; clearInterval(wzTimer); wzChime([523, 659, 784, 1047]); }
+  if (wz.i >= WARMUP.length) { wz.phase = 'done'; wz.end = 0; clearInterval(wzTimer); wzChime([523, 659, 784, 1047]); if (S.active) { S.active.warmup = WARMUP.slice(); save(); } }
   else wzPhase('ready', WZ_READY);
 }
 function wzSetDone() {
@@ -393,7 +396,7 @@ function wzHtml() {
   if (w.phase === 'done') return `${bar}<div class="wz-done"><div class="wz-enso"><svg viewBox="0 0 200 200" aria-hidden="true"><path class="e1" d="M146 36A74 74 0 1 0 172 106"/><path class="e2" d="M150 32A78 78 0 1 0 176 112"/></svg>
       <img class="inkw zen" src="art/meditacio.png" alt=""><span class="wz-seal" lang="ja" aria-hidden="true">整</span><span class="wz-vert" lang="ja" aria-hidden="true">準備完了</span></div>
     <h3>Escalfament fet</h3></div>
-    <button class="primary" style="width:100%" onclick="beginSession()">Començar sessió</button>`;
+    <button class="primary" style="width:100%" onclick="warmupBack()">${S.active ? 'Tornar a la sessió' : 'Començar sessió'}</button>`;
   const s = WARMUP[w.i], timed = w.end > 0, left = timed ? Math.max(0, (w.end - Date.now()) / 1000) : 0;
   const tag = { ready: 'Prepara\'t', work: 'Ara', rest: 'Descans' }[w.phase];
   const big = timed ? Math.ceil(left) : s.reps, unit = timed ? 's' : '×';
@@ -415,9 +418,10 @@ function wzHtml() {
       <div><button aria-label="Exercici següent" onclick="wzSkip()"><svg viewBox="0 0 24 24"><path d="M5 5L12 12L5 19M12 5L19 12L12 19"/></svg></button></div></div>`;
 }
 function beginSession() {
+  if (S.active) { wzStop(); picking = false; return go('session'); }
   wzStop();
   const color = gradeAt(gi(S.profile.maxGrade) - 1).split(' ')[0], level = 'fàcil';
-  S.active = { id: Date.now(), date: today(), start: Date.now(), type: homeOnly(planDay((new Date().getDay() + 6) % 7)) ? 'casa' : 'escalada', climbs: [], exercises: [], warmup: WARMUP.slice(), pick: { color, level } };
+  S.active = { id: Date.now(), date: today(), start: Date.now(), type: homeOnly(planDay((new Date().getDay() + 6) % 7)) ? 'casa' : 'escalada', climbs: [], exercises: [], warmup: null, pick: { color, level, style: 'bloc', result: 'flash' } };
   picking = false; save(); go('session');
 }
 // Temporitzador d'intervals: temps de treball, descans, repeticions, sèries i descans entre sèries.
@@ -548,7 +552,7 @@ function viewWarmups() {
 let wzAsk = false;
 function wzAskCancel(v) { wzAsk = v; render(); }
 function wzCancel() { if (wz && !['intro', 'done'].includes(wz.phase)) wzAskCancel(true); else wzQuit(); }
-function wzQuit() { wzAsk = false; wzStop(); picking = false; go('home'); }
+function wzQuit() { wzAsk = false; wzStop(); picking = false; S.active ? render() : go('home'); }
 function tick() {
   if (!S.active) return;
   const el = $('clock'); if (el) el.textContent = fmt((Date.now() - S.active.start) / 1000);
@@ -574,14 +578,13 @@ function viewSessionIdle() {
 }
 function viewSession() {
   const a = S.active;
-  if (!a && picking) return viewWarmups();
+  if (picking) return viewWarmups();
   if (!a) return `<div class="card"><button class="primary" style="width:100%" onclick="startSession()">${ic('play')}Començar sessió</button></div>${viewSessionIdle()}`;
   const pick = a.pick || (a.pick = { color: 'Verd', level: 'fàcil' });
   return `
   <div class="card">
     <div class="seg">${Object.entries(TYPES).map(([t, n]) => `<button class="${a.type === t ? 'on' : ''}" onclick="setType('${t}')">${n}</button>`).join('')}</div>
-    ${Array.isArray(a.warmup) ? `<details><summary class="muted">Escalfament</summary>
-      ${warmSteps(a.warmup)}</details>` : ''}
+    ${Array.isArray(a.warmup) ? `<p class="wudone">${ic('check')}Escalfament fet</p>` : `<button class="small wubtn" onclick="openWarmup()">${ic('play')}Escalfament guiat <small>opcional · 5 min</small></button>`}
     <div class="timer" id="clock">00:00</div>
     <div class="timer rest" id="rest" style="font-size:28px"></div>
     <div class="seg">
@@ -593,13 +596,12 @@ function viewSession() {
     <ul class="list">${climbToday().map(n => `<li>${exLabel(n)}</li>`).join('')}</ul></div>` : ''}<div class="card">
     <div class="cardhead"><h2>Afegir via</h2>
       <button class="starbtn ${pick.first ? 'on' : ''}" aria-label="Primer cop" aria-pressed="${!!pick.first}" title="Primer cop" onclick="toggleFirst(this)">${ic('star')}</button></div>
-    <div class="colors">${Object.entries(COLORS).map(([c, hex]) => `<button class="swatch ${pick.color === c ? 'on' : ''}" style="--c:${hex}" aria-label="${c}" title="${c}" onclick="setPick('color','${c}')"></button>`).join('')}</div>
-    <div class="lvl">${LEVELS.map(l => `<button class="${pick.level === l ? 'on' : ''}" onclick="setPick('level','${l}')">${l[0].toUpperCase() + l.slice(1)}</button>`).join('')}</div>
-    <div class="gradebadge" style="--c:${COLORS[pick.color]}"><i></i><b>${pick.color} ${pick.level}</b></div>
     ${tilePick('style', STYLES, pick.style || 'bloc', 'two')}
     ${tilePick('result', RESULTS, pick.result || 'flash', 'three')}
-    <button class="primary" style="width:100%;margin-top:14px" onclick="addClimb()">+ Afegir</button>
-    <ul class="list">${a.climbs.map((c, i) => `<li><span>${dot(c.grade)}<b>${c.grade}</b> <span class="ics">${ic(c.style)}${ic(c.result)}${c.first ? ic('star') : ''}</span></span>
+    <p class="muted qhint">Toca el grau per afegir la via</p>
+    <div class="qgrid">${Object.entries(COLORS).map(([c, hex]) => LEVELS.map(l => { const g = `${c} ${l}`, n = a.climbs.filter(x => x.grade === g).length;
+      return `<button class="qg${l === LEVELS[1] ? ' hard' : ''}" style="--c:${hex}" onclick="quickClimb('${g}')" aria-label="Afegir ${g}"><i></i><span>${c}<small>${l}</small></span>${n ? `<em>${n}</em>` : ''}</button>`; }).join('')).join('')}</div>
+    <ul class="list qlist">${a.climbs.map((c, i) => [c, i]).reverse().map(([c, i]) => `<li><span>${dot(c.grade)}<b>${c.grade}</b> <span class="ics">${ic(c.style)}${ic(c.result)}${c.first ? ic('star') : ''}</span></span>
       <button class="small danger" aria-label="Esborrar" onclick="S.active.climbs.splice(${i},1);save();render()">${ic('x')}</button></li>`).join('')}</ul>
   </div>` : viewGym(a)}
   <div class="card">
@@ -678,6 +680,14 @@ function setSeg(key, v) {
   document.querySelectorAll(`#sg-${key} button`).forEach(b => b.classList.toggle('on', b.dataset.v === v));
 }
 function setPick(k, v) { S.active.pick[k] = v; save(); render(); }
+// Un sol toc: afegeix la via amb l'estil i el resultat marcats (i l'estrella si està encesa)
+function quickClimb(g) {
+  const p = S.active.pick;
+  S.active.climbs.push({ grade: g, style: p.style || 'bloc', result: p.result || 'flash', first: !!p.first });
+  p.first = false; save(); render();
+  if (navigator.vibrate) navigator.vibrate(12);
+  toast(`${g} afegida · ${S.active.climbs.length} ${S.active.climbs.length === 1 ? 'via' : 'vies'}`);
+}
 function addClimb() {
   const p = S.active.pick;
   S.active.climbs.push({ grade: `${p.color} ${p.level}`, style: p.style || 'bloc', result: p.result || 'flash', first: !!p.first });
@@ -735,7 +745,9 @@ function finishSession() {
     duration: Math.max(1, Math.round((Date.now() - a.start) / 60000)),
     rpe: a.rpe || 5, fatigue: a.fatigue || 5
   });
+  const s0 = S.sessions[0];
   S.active = null; restEnd = 0; save(); go('home');
+  toast(`Sessió desada · ${s0.duration} min${(s0.climbs || []).length ? ` · ${s0.climbs.length} vies` : ''}`);
 }
 // Les confirmacions es fan dins la pàgina (confirm() no funciona a tots els navegadors)
 let discardAsk = false;
