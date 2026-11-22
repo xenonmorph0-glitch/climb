@@ -113,8 +113,11 @@ function go(t) {
   const dir = TAB_ORDER.indexOf(t) >= TAB_ORDER.indexOf(tab) ? 1 : -1, same = t === tab;
   if (!same && !matchMedia('(prefers-reduced-motion: reduce)').matches) leaveGhost(dir);
   tab = t; planOff = {}; pd = null; profEdit = false; if (t !== 'history') calOpen = null;
-  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-  { const bs = [...document.querySelectorAll('#tabs button')]; $('tabs').style.setProperty('--x', ((bs.findIndex(b => b.dataset.tab === t) + .5) / bs.length * 100) + '%'); }
+  if (t !== 'timer' && !itvRun) hgView = false;
+  // El temporitzador no té botó propi (s'hi arriba des de la sessió): la barra manté "Sessió" il·luminada
+  const navT = t === 'timer' ? 'session' : t;
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === navT));
+  { const bs = [...document.querySelectorAll('#tabs button')]; $('tabs').style.setProperty('--x', ((bs.findIndex(b => b.dataset.tab === navT) + .5) / bs.length * 100) + '%'); }
   $('title').textContent = { home: 'Inici', session: 'Sessió', timer: 'Temporitzador', history: 'Historial', plan: 'Pla d\'entrenament', profile: 'Perfil' }[t];
   $('jp').textContent = { home: '今日', session: '登る', timer: '時', history: '記録', plan: '計画', profile: '身体' }[t];
   render();
@@ -454,6 +457,8 @@ function itvTotal() {
   const t = itv.sets * (itv.reps * itv.work + (itv.reps - 1) * itv.rest) + (itv.sets - 1) * itv.setRest;
   return `Total ${fmt(t)} · ${itv.sets * itv.reps} ${itv.sets * itv.reps === 1 ? 'repetició' : 'repeticions'}`;
 }
+// Resum curt d'un preset per mostrar sota el nom de l'exercici (ex. "4×10 s / 10 s · 3 sèries")
+const itvPresetLabel = p => `${p.reps}×${p.work} s${p.rest ? ` / ${p.rest} s` : ''}${p.sets > 1 ? ` · ${p.sets} sèries` : ''}`;
 function setItv(k, el) {
   const v = Math.max(ITV_MIN[k], Math.min(k === 'reps' || k === 'sets' ? 99 : 3600, parseInt(el.value) || 0));
   itv[k] = v; el.value = v; saveItv();
@@ -494,7 +499,66 @@ function itvStart() {
   itvRun = { phase: 'ready', rep: 1, set: 1, end: Date.now() + 3000, last: null };
   itvTimer = setInterval(itvTick, 200); itvTick(); wakeSync();
 }
-function itvStop() { clearInterval(itvTimer); itvRun = null; itvSync(); wakeSync(); }
+function itvStop() {
+  clearInterval(itvTimer); itvRun = null; itvSync(); wakeSync();
+  // Si el temporitzador s'ha acabat sol i venia d'un exercici de la sessió (ex. l'hangboard), el marca fet i torna sol
+  if (itvDone && itvFrom && itvFrom.tab === 'session' && S.active) {
+    const a = S.active; a.gymDone = a.gymDone || {}; a.gymDone[itvFrom.i] = true;
+    // Premi: 10 tirades del gacha, una vegada per sessió
+    const paid = !a.hangPaid; if (paid) { a.hangPaid = true; gs().bonus += G_HANG_BONUS; }
+    syncGym(); itvFrom = null; itvSync();
+    toast(paid ? `+${G_HANG_BONUS} tirades` : 'Fet');
+    if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
+    setTimeout(() => { if (!itvRun && tab === 'timer') go('session'); }, 2600);
+  }
+}
+// Timers predefinits per a exercicis concrets (treball, descans, repeticions, sèries, descans entre sèries)
+const HANGBOARD_EX = 'Hangboard a casa';
+const EX_PRESETS = { [HANGBOARD_EX]: { work: 10, rest: 10, reps: 4, sets: 3, setRest: 180 } };
+let itvFrom = null;   // d'on s'ha obert el temporitzador (per tornar-hi sol en acabar)
+const G_HANG_BONUS = 10;
+let hgView = false;    // pantalla visual de l'entrenament guiat (es manté fins que surts, per veure el final)
+// Obre el temporitzador ja preparat per a un exercici del gym/casa de la sessió, i el comença de seguida
+function startExTimer(i, name) {
+  const p = EX_PRESETS[name]; if (!p || itvRun) return;
+  Object.assign(itv, p); itvDone = false; saveItv();
+  itvFrom = { tab: 'session', i, name }; hgView = true;
+  go('timer'); itvStart();
+}
+function itvBackToSession() { go('session'); }
+// Pantalla visual (sense text): anell de color segons la fase, número gran, punts de repeticions i barres de sèries
+const HG_C = 2 * Math.PI * 88;
+const HG_PH = { ready: 'ready', work: 'work', rest: 'rest', setrest: 'setrest' };
+function viewHang() {
+  const img = EXIMG[HANGBOARD_EX] ? `<img src="exercicis/${EXIMG[HANGBOARD_EX]}" alt="">` : '';
+  return `<div class="card hg" id="hgw">
+    ${S.active ? `<button class="dayback" aria-label="Tornar a la sessió" onclick="itvBackToSession()"><svg viewBox="0 0 24 24"><path d="M15 5L8 12L15 19"/></svg></button>` : ''}
+    <div class="hg-stage"><div class="hg-glow"></div>
+      <svg class="hg-ring" viewBox="0 0 200 200" aria-hidden="true"><circle class="t" cx="100" cy="100" r="88"/><circle class="p" id="hgr" cx="100" cy="100" r="88" style="stroke-dasharray:${HG_C.toFixed(1)};stroke-dashoffset:0"/></svg>
+      <div class="hg-mid"><span class="hg-img">${img}</span><span class="hg-pause" aria-hidden="true"><i></i><i></i></span><b id="hgn">${itv.work}</b>
+        <span class="hg-win" aria-hidden="true">${ic('check')}<em>+${G_HANG_BONUS}<small lang="ja">運</small></em></span></div></div>
+    <div class="hg-sets" id="hgsets">${[...Array(itv.sets)].map(() => '<i><b></b></i>').join('')}</div>
+    <div class="hg-reps" id="hgreps">${[...Array(itv.reps)].map(() => '<i></i>').join('')}</div>
+    <button class="hg-btn" id="hgbtn" aria-label="Aturar o començar" onclick="itvStart()">${ic('stop')}</button>
+  </div>`;
+}
+function hgSync(left) {
+  const w = $('hgw'); if (!w) return false;
+  const r = itvRun, ph = r ? r.phase : itvDone ? 'done' : 'idle';
+  w.className = 'card hg ' + ph;
+  const dur = r ? { ready: 3, work: itv.work, rest: itv.rest, setrest: itv.setRest }[r.phase] || 1 : 1, f = r ? Math.max(0, Math.min(1, left / dur)) : itvDone ? 0 : 1;
+  $('hgr').style.strokeDashoffset = (HG_C * (1 - f)).toFixed(1);
+  const n = $('hgn'), v = r ? Math.max(0, Math.ceil(left)) : itv.work;
+  const txt = r && r.phase === 'setrest' && v >= 60 ? fmt(v) : String(v);
+  if (n.textContent !== txt) { n.textContent = txt; n.classList.remove('tk'); void n.offsetWidth; n.classList.add('tk'); }
+  const set = r ? r.set : itvDone ? itv.sets + 1 : 1, rep = r ? r.rep : 0;
+  // la barra de la sèrie actual s'omple amb les repeticions fetes
+  const comp = !r ? 0 : r.phase === 'work' ? rep - 1 + (1 - f) : r.phase === 'rest' ? rep : r.phase === 'setrest' ? itv.reps : 0;
+  w.querySelectorAll('#hgsets i').forEach((e, k) => { e.className = k + 1 < set ? 'done' : k + 1 === set ? 'cur' : ''; e.style.setProperty('--f', k + 1 === set ? (comp / itv.reps).toFixed(3) : k + 1 < set ? '1' : '0'); });
+  w.querySelectorAll('#hgreps i').forEach((e, k) => { e.className = itvDone || k + 1 < rep || (k + 1 === rep && r && r.phase !== 'work') ? 'done' : k + 1 === rep && r && r.phase === 'work' ? 'cur' : ''; });
+  $('hgbtn').innerHTML = r ? ic('stop') : ic('play');
+  return true;
+}
 function itvTick() {
   if (!itvRun) return;
   const r = itvRun;
@@ -515,6 +579,7 @@ function itvTick() {
   itvSync(left);
 }
 function itvSync(left) {
+  if (hgSync(left)) return;
   const d = $('itvDisp'); if (!d) return;
   const r = itvRun;
   d.className = 'timer' + (r && r.phase !== 'work' ? ' rest' : '');
@@ -525,8 +590,10 @@ function itvSync(left) {
   document.querySelectorAll('.itvin').forEach(i => i.disabled = !!r);
 }
 function viewItv() {
-  const f = (k, lbl) => `<div><label>${lbl}</label><input class="itvin" type="number" inputmode="numeric" min="${ITV_MIN[k]}" value="${itv[k]}" onchange="setItv('${k}',this)"></div>`;
-  return `<div class="card"><h2>Temporitzador</h2>
+  if (hgView) return viewHang();
+  const f =(k, lbl) => `<div><label>${lbl}</label><input class="itvin" type="number" inputmode="numeric" min="${ITV_MIN[k]}" value="${itv[k]}" onchange="setItv('${k}',this)"></div>`;
+  const back = itvFrom && S.active ? `<button class="dayback" aria-label="Tornar a la sessió" onclick="itvBackToSession()"><svg viewBox="0 0 24 24"><path d="M15 5L8 12L15 19"/></svg></button>` : '';
+  return `<div class="card">${back}<h2${back ? ' class="dayh"' : ''}>Temporitzador</h2>
     <div class="row">${f('work', 'Treball (s)')}${f('rest', 'Descans (s)')}${f('reps', 'Repeticions')}</div>
     <div class="row">${f('sets', 'Sèries')}${f('setRest', 'Descans sèries (s)')}</div>
     <div class="timer" id="itvDisp">${fmt(itv.work)}</div>
@@ -716,8 +783,9 @@ function viewGym(a) {
     ${r.isToday ? '' : `<p><span class="tag warn">Proper dia</span></p>`}
     <ul class="list">${r.items.map((it, i) => `<li class="gymrow">
       <button class="check ${done[i] ? 'on' : ''}" aria-label="Fet" onclick="toggleGym(${i})">${done[i] ? ic('check') : ''}</button>
-      <span style="flex:1"><b>${exLabel(it.name)}</b></span>
-      <input type="number" min="0" inputmode="decimal" placeholder="kg" style="width:72px" value="${load[i] || ''}" onchange="setGymLoad(${i},this.value)">
+      <span style="flex:1"><b>${exLabel(it.name)}</b>${EX_PRESETS[it.name] ? `<small class="muted exttot">${itvPresetLabel(EX_PRESETS[it.name])}</small>` : ''}</span>
+      ${EX_PRESETS[it.name] ? `<button class="small" style="flex:none" onclick="startExTimer(${i},'${it.name}')">${ic('play')}Timer</button>`
+        : `<input type="number" min="0" inputmode="decimal" placeholder="kg" style="width:72px" value="${load[i] || ''}" onchange="setGymLoad(${i},this.value)">`}
     </li>`).join('')}</ul>
     <p class="muted">${Object.values(done).filter(Boolean).length}/${r.items.length} fets</p>
   </div>`;
@@ -746,13 +814,13 @@ function finishSession() {
     rpe: a.rpe || 5, fatigue: a.fatigue || 5
   });
   const s0 = S.sessions[0];
-  S.active = null; restEnd = 0; save(); go('home');
+  S.active = null; restEnd = 0; itvFrom = null; save(); go('home');
   toast(`Sessió desada · ${s0.duration} min${(s0.climbs || []).length ? ` · ${s0.climbs.length} vies` : ''}`);
 }
 // Les confirmacions es fan dins la pàgina (confirm() no funciona a tots els navegadors)
 let discardAsk = false;
 function askDiscard(v) { discardAsk = v; render(); }
-function cancelSession() { discardAsk = false; S.active = null; save(); go('home'); }
+function cancelSession() { discardAsk = false; S.active = null; itvFrom = null; save(); go('home'); }
 
 // ---------- Historial ----------
 // Detall d'una sessió: es mostra en tocar el dia al calendari
@@ -1364,6 +1432,7 @@ const gs = () => {
   if (!g.own || typeof g.own !== 'object') g.own = {};
   if (typeof g.eq !== 'number') g.eq = -1;
   if (typeof g.pulls !== 'number') g.pulls = 0;
+  if (typeof g.bonus !== 'number') g.bonus = 0;   // tirades extra guanyades (ex. acabar l'hangboard)
   return g;
 };
 const G_PER_SESSION = 10;   // tirades que dóna cada sessió desada
@@ -1374,7 +1443,7 @@ const G_MIN_MIN = 60, G_CLIMB = { 'Marró': 2, Vermell: 10, Blanc: 100 };
 const gEarned = () => S.sessions.reduce((a, s) => (s.duration || 0) >= G_MIN_MIN
   ? a + G_PER_SESSION + (s.climbs || []).reduce((b, c) => b + (G_CLIMB[String(c.grade || '').split(' ')[0]] || 0), 0) : a, 0);
 const G_START = 170;   // tirades amb què comença tothom (100 + 20 + 50 de regal)
-const gTokens = () => Math.max(0, gEarned() + G_START - gs().spent);
+const gTokens = () => Math.max(0, gEarned() + G_START + gs().bonus - gs().spent);
 // Barra de sort: s'omple amb cada tirada sense cap esfera especial (èpic o més rara) i com més plena, més probabilitat d'especial.
 // Quant s'omple depèn del que surt: com més comuna l'esfera, més puja; en sortir un especial es buida del tot.
 const G_SPECIAL = 3, G_PITY_MAX = 100, G_ADD = [1.6, 1.1, .6];
