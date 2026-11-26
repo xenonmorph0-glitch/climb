@@ -514,7 +514,7 @@ function itvStop() {
 }
 // Timers predefinits per a exercicis concrets (treball, descans, repeticions, sèries, descans entre sèries)
 const HANGBOARD_EX = 'Hangboard a casa';
-const EX_PRESETS = { [HANGBOARD_EX]: { work: 10, rest: 10, reps: 4, sets: 3, setRest: 180 } };
+const EX_PRESETS = { [HANGBOARD_EX]: { work: 10, rest: 50, reps: 10, sets: 1, setRest: 0 } };
 let itvFrom = null;   // d'on s'ha obert el temporitzador (per tornar-hi sol en acabar)
 const G_HANG_BONUS = 10;
 let hgView = false;    // pantalla visual de l'entrenament guiat (es manté fins que surts, per veure el final)
