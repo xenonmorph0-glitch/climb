@@ -1312,8 +1312,6 @@ img { -webkit-user-drag: none; }
 .hg-ring .p { stroke: var(--pc); stroke-linecap: round; transition: stroke-dashoffset .22s linear, stroke .4s; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--pc) 70%, transparent)); }
 .hg-mid { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 2px; }
 .hg-mid b { font-size: clamp(64px, 22vw, 96px); line-height: 1; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 24px color-mix(in srgb, var(--pc) 60%, transparent); }
-.hg-mid b.tk { animation: hgtk .35s cubic-bezier(.2, 1.6, .4, 1); }
-@keyframes hgtk { from { transform: scale(1.18); } }
 .hg-img img { width: 46px; height: 46px; object-fit: contain; opacity: .95; filter: drop-shadow(0 0 8px var(--pc)); }
 .hg-pause { display: none; gap: 7px; height: 40px; align-items: center; }
 .hg-pause i { width: 9px; height: 30px; border-radius: 4px; background: var(--pc); box-shadow: 0 0 10px var(--pc); }

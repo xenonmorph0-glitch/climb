@@ -428,22 +428,34 @@ function beginSession() {
   picking = false; save(); go('session');
 }
 // Temporitzador d'intervals: temps de treball, descans, repeticions, sèries i descans entre sèries.
-// En iniciar hi ha sempre 3 s de preparació. Fa un pit als últims 3 s de cada fase (l'últim segon més agut i llarg);
-// quan comença el treball no sona res. Els ajustos es poden guardar amb un nom.
+// En iniciar hi ha sempre 3 s de preparació. Sons: pit curt als 3-2-1 s, un so diferent just quan acaba cada fase,
+// un avís de dues notes quan queden 10 s de descans, i una melodia en acabar-ho tot. Sense vibració.
+// Els ajustos es poden guardar amb un nom.
 const ITV_KEY = 'escalada-itv';
 let itv = { work: 10, rest: 20, reps: 3, sets: 1, setRest: 60 }, itvRun = null, itvDone = false, itvTimer = null, audioCtx = null;
 try { Object.assign(itv, JSON.parse(localStorage.getItem(ITV_KEY))); } catch {}
-function beep(freq, ms) {
+function audioOn() {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.frequency.value = freq; g.gain.value = 0.25;
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(); o.stop(audioCtx.currentTime + ms / 1000);
   } catch {}
-  if (navigator.vibrate) navigator.vibrate(ms);
+  return audioCtx;
 }
+// To amb entrada i sortida suaus (sense "clic"); `at` = segons de retard dins el rellotge d'àudio
+function beep(freq, ms, at = 0, vol = 0.25) {
+  const c = audioOn(); if (!c) return;
+  try {
+    const t = c.currentTime + at, d = ms / 1000, o = c.createOscillator(), g = c.createGain();
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.008);
+    g.gain.setValueAtTime(vol, t + Math.max(0.01, d - 0.04)); g.gain.linearRampToValueAtTime(0, t + d);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + d + 0.02);
+  } catch {}
+}
+const sndCount = () => beep(880, 110);                                  // 3, 2, 1
+const sndEnd = () => { beep(1568, 160); beep(2093, 320, 0.15); };        // s'acaba la fase
+const sndWarn = () => { beep(660, 170); beep(990, 170, 0.22); };         // queden 10 s de descans
+const sndDone = () => [1047, 1319, 1568, 2093].forEach((f, k) => beep(f, k === 3 ? 500 : 160, k * 0.15));
 const ITV_MIN = { work: 1, rest: 0, reps: 1, sets: 1, setRest: 0 };
 const PRE_KEY = 'escalada-itv-presets';
 let itvPresets = [];
@@ -496,11 +508,12 @@ function delConfirm(i) { itvPresets.splice(i, 1); delAsk = -1; saveItv(); render
 function itvStart() {
   if (itvRun) return itvStop();
   itvDone = false;
-  itvRun = { phase: 'ready', rep: 1, set: 1, end: Date.now() + 3000, last: null };
-  itvTimer = setInterval(itvTick, 200); itvTick(); wakeSync();
+  audioOn();   // desbloqueja l'àudio amb el toc de l'usuari (al mòbil, si no, el primer pit pot no sonar o arribar tard)
+  itvRun = { phase: 'ready', rep: 1, set: 1, end: Date.now() + 3000, last: null, warned: false };
+  clearTimeout(itvTimer); itvTick(); wakeSync();
 }
 function itvStop() {
-  clearInterval(itvTimer); itvRun = null; itvSync(); wakeSync();
+  clearTimeout(itvTimer); itvRun = null; itvSync(); wakeSync();
   // Si el temporitzador s'ha acabat sol i venia d'un exercici de la sessió (ex. l'hangboard), el marca fet i torna sol
   if (itvDone && itvFrom && itvFrom.tab === 'session' && S.active) {
     const a = S.active; a.gymDone = a.gymDone || {}; a.gymDone[itvFrom.i] = true;
@@ -508,7 +521,6 @@ function itvStop() {
     const paid = !a.hangPaid; if (paid) { a.hangPaid = true; gs().bonus += G_HANG_BONUS; }
     syncGym(); itvFrom = null; itvSync();
     toast(paid ? `+${G_HANG_BONUS} tirades` : 'Fet');
-    if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
     setTimeout(() => { if (!itvRun && tab === 'timer') go('session'); }, 2600);
   }
 }
@@ -550,7 +562,7 @@ function hgSync(left) {
   $('hgr').style.strokeDashoffset = (HG_C * (1 - f)).toFixed(1);
   const n = $('hgn'), v = r ? Math.max(0, Math.ceil(left)) : itv.work;
   const txt = r && r.phase === 'setrest' && v >= 60 ? fmt(v) : String(v);
-  if (n.textContent !== txt) { n.textContent = txt; n.classList.remove('tk'); void n.offsetWidth; n.classList.add('tk'); }
+  if (n.textContent !== txt) n.textContent = txt;
   const set = r ? r.set : itvDone ? itv.sets + 1 : 1, rep = r ? r.rep : 0;
   // la barra de la sèrie actual s'omple amb les repeticions fetes
   const comp = !r ? 0 : r.phase === 'work' ? rep - 1 + (1 - f) : r.phase === 'rest' ? rep : r.phase === 'setrest' ? itv.reps : 0;
@@ -559,24 +571,31 @@ function hgSync(left) {
   $('hgbtn').innerHTML = r ? ic('stop') : ic('play');
   return true;
 }
+// Cada fase comença exactament on acaba l'anterior (r.end += durada), així no s'acumula retard.
+// El següent tic es programa just després del canvi de segon (i com a mínim 4 cops per segon per a l'anell),
+// perquè el número canviï a l'hora i cada segon duri un segon sencer.
 function itvTick() {
   if (!itvRun) return;
   const r = itvRun;
   let left = (r.end - Date.now()) / 1000;
-  const sec = Math.ceil(left);
-  if (sec >= 1 && sec <= 3 && r.last !== sec) { r.last = sec; sec === 1 ? beep(1760, 350) : beep(880, 150); }
   if (left <= 0) {
-    const rest = (phase, sec) => { r.phase = phase; r.end = Date.now() + sec * 1000; };
-    const work = () => { r.phase = 'work'; r.end = Date.now() + itv.work * 1000; };
-    if (r.phase === 'ready') work();
-    else if (r.phase === 'rest') { r.rep++; work(); }
-    else if (r.phase === 'setrest') { r.set++; r.rep = 1; work(); }
-    else if (r.rep < itv.reps) { if (itv.rest > 0) rest('rest', itv.rest); else { r.rep++; work(); } }
-    else if (r.set < itv.sets) { if (itv.setRest > 0) rest('setrest', itv.setRest); else { r.set++; r.rep = 1; work(); } }
-    else { itvDone = true; beep(1320, 500); return itvStop(); }
-    r.last = null; left = (r.end - Date.now()) / 1000;
+    const t0 = r.end, next = (phase, s) => { r.phase = phase; r.end = t0 + s * 1000; };
+    if (r.phase === 'ready') next('work', itv.work);
+    else if (r.phase === 'rest') { r.rep++; next('work', itv.work); }
+    else if (r.phase === 'setrest') { r.set++; r.rep = 1; next('work', itv.work); }
+    else if (r.rep < itv.reps) { if (itv.rest > 0) next('rest', itv.rest); else { r.rep++; next('work', itv.work); } }
+    else if (r.set < itv.sets) { if (itv.setRest > 0) next('setrest', itv.setRest); else { r.set++; r.rep = 1; next('work', itv.work); } }
+    else { itvDone = true; sndDone(); return itvStop(); }
+    sndEnd();
+    r.warned = false; left = (r.end - Date.now()) / 1000; r.last = Math.ceil(left);   // no es solapa el pit amb el so de canvi
   }
+  const sec = Math.ceil(left);
+  const dur = { ready: 3, work: itv.work, rest: itv.rest, setrest: itv.setRest }[r.phase];
+  if (sec >= 1 && sec <= 3 && r.last !== sec) { r.last = sec; sndCount(); }
+  if ((r.phase === 'rest' || r.phase === 'setrest') && dur > 10 && !r.warned && left <= 10) { r.warned = true; if (sec >= 9) sndWarn(); }
   itvSync(left);
+  const toNext = (left - Math.floor(left)) * 1000;   // ms fins al pròxim canvi de segon
+  itvTimer = setTimeout(itvTick, left <= 0 ? 5 : Math.max(5, Math.min(250, (toNext || 1000) + 4)));
 }
 function itvSync(left) {
   if (hgSync(left)) return;
@@ -627,7 +646,6 @@ function tick() {
   if (r) {
     const left = (restEnd - Date.now()) / 1000;
     r.textContent = restEnd ? (left > 0 ? 'Descans ' + fmt(left) : 'Som-hi!') : '';
-    if (restEnd && left <= 0 && left > -0.3 && navigator.vibrate) navigator.vibrate([200, 100, 200]);
   }
 }
 function startRest(sec) { restEnd = Date.now() + sec * 1000; tick(); }
@@ -752,7 +770,7 @@ function quickClimb(g) {
   const p = S.active.pick;
   S.active.climbs.push({ grade: g, style: p.style || 'bloc', result: p.result || 'flash', first: !!p.first });
   p.first = false; save(); render();
-  if (navigator.vibrate) navigator.vibrate(12);
+
   toast(`${g} afegida · ${S.active.climbs.length} ${S.active.climbs.length === 1 ? 'via' : 'vies'}`);
 }
 function addClimb() {
@@ -1444,9 +1462,10 @@ const gEarned = () => S.sessions.reduce((a, s) => (s.duration || 0) >= G_MIN_MIN
   ? a + G_PER_SESSION + (s.climbs || []).reduce((b, c) => b + (G_CLIMB[String(c.grade || '').split(' ')[0]] || 0), 0) : a, 0);
 const G_START = 170;   // tirades amb què comença tothom (100 + 20 + 50 de regal)
 const gTokens = () => Math.max(0, gEarned() + G_START + gs().bonus - gs().spent);
-// Barra de sort: s'omple amb cada tirada sense cap esfera especial (èpic o més rara) i com més plena, més probabilitat d'especial.
-// Quant s'omple depèn del que surt: com més comuna l'esfera, més puja; en sortir un especial es buida del tot.
-const G_SPECIAL = 3, G_PITY_MAX = 100, G_ADD = [1.6, 1.1, .6];
+// Barra de sort: s'omple una mica amb cada tirada fins que surt una esfera d'1 entre 1.000.000 o més rara (diví o més),
+// i quan és a prop de plena puja la probabilitat que en surti una (de mitjana cap al 80 %). Plena (G_PITY_MAX tirades)
+// = diví o més assegurat; aleshores es buida.
+const G_SPECIAL = 6, G_PITY_MAX = 100, G_PITY_EXP = 10;
 const gPityF = () => Math.min(1, gs().pity / G_PITY_MAX);
 const G_SPEC_IDS = GORBS.map((_, i) => i).filter(i => gTi(i) >= G_SPECIAL), G_SPEC_TOT = G_SPEC_IDS.reduce((a, i) => a + GP[i], 0);
 function gRollSpecial() { let u = gRand() * G_SPEC_TOT, c = 0; for (const i of G_SPEC_IDS) { c += GP[i]; if (u < c) return i; } return G_SPEC_IDS[0]; }
@@ -1481,10 +1500,10 @@ function gachaMulti(n, forceI) {
     if (g.dday !== today()) { g.dday = today(); g.dpulls = 0; }
     const forced = k === 0 && forceI != null;
     // Barra de sort: la probabilitat que la tirada sigui especial puja amb la barra (arriba a 100 % quan és plena)
-    let i = forced ? forceI : (gRand() < gPityF() ** 2.5 ? gRollSpecial() : gRoll());
+    let i = forced ? forceI : (gRand() < gPityF() ** G_PITY_EXP ? gRollSpecial() : gRoll());
     if (!forced && g.dpulls < G_DAILY && gRand() < G_LUCK) { const j = gRoll(); if (j > i) i = j; }
     g.dpulls++;
-    { const ti = gTi(i); g.pity = ti >= G_SPECIAL ? 0 : Math.min(G_PITY_MAX, g.pity + G_ADD[ti]); }
+    g.pity = gTi(i) >= G_SPECIAL ? 0 : Math.min(G_PITY_MAX, g.pity + 1);
     res.push({ i, isNew: !g.own[i] }); g.own[i] = (g.own[i] || 0) + 1; g.pulls++;
   }
   save(); gWishStart(res);
@@ -1525,7 +1544,7 @@ function orbHtml(i, size = 64, mode = 'still') {
   if (t >= 8) x += '<i class="wave"></i>';
   return `<span class="orb t${t} ${mode}${t === 9 ? ' rb' : ''}" style="--s:${size}px;--h1:${h1};--h2:${h2};--sat:${sat}%" aria-hidden="true">${x}</span>`;
 }
-// Barra de sort (sense text): s'omple amb les tirades sense cap esfera especial; plena = tirada especial assegurada
+// Barra de sort (sense text): s'omple tirada a tirada fins que surt un diví o més (1/1.000.000); plena = assegurat
 function gLuckBar() {
   const f = gPityF();
   return `<div class="gluck ${f >= .85 ? 'hot' : ''}" style="--f:${f.toFixed(3)}" role="img" aria-label="Sort ${Math.round(f * 100)} %"><i></i></div>`;
@@ -1638,7 +1657,7 @@ function gWishStart(res) {
     const w = document.querySelector('#gsheet .gwish'); if (!w) return;
     w.style.setProperty('--e', ((k + 1) / items.length).toFixed(2)); const d = w.querySelectorAll('.wdots i')[k]; if (d) d.classList.add('on');
     const ob = w.querySelectorAll('.worb i')[k]; if (ob) ob.classList.add('on');   // l'energia de cada tirada queda orbitant el cercle
-    gRip(cols[k]); if (navigator.vibrate && gTi(it.r.i) >= 4) navigator.vibrate(14);
+    gRip(cols[k]);
   }, (it.dl + it.du * .92) * 1000)));
   gW.timers.push(setTimeout(() => { const w = document.querySelector('#gsheet .gwish'); if (w) w.classList.add('implode'); }, Math.max(0, T - .8) * 1000));
   // El color de l'escena comença neutre i puja per les categories: les baixes ràpid, les altes durant el final lent
@@ -1651,7 +1670,6 @@ function gWishStart(res) {
       const ts_ = w.querySelectorAll('.wtints i'); ts_.forEach((e, k) => e.classList.toggle('on', k === j - 1));
     }, at * 1000));
   }
-  if (best >= 6 && navigator.vibrate) gW.timers.push(setTimeout(() => navigator.vibrate(best >= 8 ? [80, 50, 80, 50, 220] : [60, 40, 140]), Math.max(0, T - .5) * 1000));
 }
 function gWishSkip() { clearTimeout(gT); gTimersOff(); if (gW && gW.n > 1) gWishSummary(); else gWishCards(); }
 // Després de la cinemàtica: al ×10 es veuen tots els resultats de cop; a la tirada ×1, l'esfera sola
