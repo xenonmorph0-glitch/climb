@@ -1460,7 +1460,7 @@ const gDev = () => !!window.DEV_UNLIMITED;   // només el posa dev.js (localhost
 const G_MIN_MIN = 60, G_CLIMB = { 'Marró': 2, Vermell: 10, Blanc: 100 };
 const gEarned = () => S.sessions.reduce((a, s) => (s.duration || 0) >= G_MIN_MIN
   ? a + G_PER_SESSION + (s.climbs || []).reduce((b, c) => b + (G_CLIMB[String(c.grade || '').split(' ')[0]] || 0), 0) : a, 0);
-const G_START = 270;   // tirades amb què comença tothom (100 + 20 + 50 + 100 de regal)
+const G_START = 290;   // tirades amb què comença tothom (100 + 20 + 50 + 100 + 20 de regal)
 const gTokens = () => Math.max(0, gEarned() + G_START + gs().bonus - gs().spent);
 // Barra de sort: s'omple una mica amb cada tirada fins que surt una esfera d'1 entre 1.000.000 o més rara (diví o més),
 // i quan és a prop de plena puja la probabilitat que en surti una (de mitjana cap al 80 %). Plena (G_PITY_MAX tirades)
